@@ -4,7 +4,6 @@ import random
 import base64
 import qrcode
 from io import BytesIO
-import json
 
 st.set_page_config(page_title="Auto Bingo", layout="centered")
 
@@ -34,8 +33,7 @@ def get_game_state():
         "game_id": 1,
         "bingo_grid": [],
         "encoded_images": [],
-        "last_game_id": 0,
-        "player_states": {}
+        "last_game_id": 0
     }
 
 game_state = get_game_state()
@@ -70,11 +68,10 @@ if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encode
         game_state["bingo_grid"] = selected_imgs
         game_state["encoded_images"] = encoded_list
         game_state["last_game_id"] = game_state["game_id"]
-        game_state["player_states"] = {}
 
 st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
-# --- INTERFEJS OD GÓRY ---
+# --- KOLEJNOŚĆ INTERFEJSU OD GÓRY ---
 
 # 1. QR Code
 with st.expander("📲 Pokaż kod QR", expanded=False):
@@ -102,7 +99,6 @@ else:
         game_state["winner"] = None
         game_state["ended"] = False
         game_state["game_id"] += 1
-        game_state["player_states"] = {}
         st.session_state["confirm_restart"] = False
         st.rerun()
 
@@ -119,7 +115,6 @@ if new_size != game_state["grid_size"]:
     game_state["winner"] = None
     game_state["ended"] = False
     game_state["game_id"] += 1
-    game_state["player_states"] = {}
     st.rerun()
 
 # 5. Odśwież stan
@@ -150,7 +145,6 @@ if game_state["ended"]:
         game_state["winner"] = None
         game_state["ended"] = False
         game_state["game_id"] += 1
-        game_state["player_states"] = {}
         st.rerun()
 else:
     if len(all_images) < required_images:
@@ -210,22 +204,22 @@ else:
             let hasWon = false;
             const gridSize = {grid_size};
             const playerName = "{player_name}";
-            const mySessionId = "{st.session_state['my_session_id']}";
+            const gameId = {game_state['game_id']};
 
-            window.addEventListener('beforeunload', function (e) {{
-                e.preventDefault();
-                e.returnValue = '';
-            }});
+            if (localStorage.getItem('last_game_id') != gameId) {{
+                hasWon = false;
+                localStorage.setItem('last_game_id', gameId);
+                localStorage.removeItem('bingo_checked');
+            }}
 
             window.onload = function() {{
                 const buttons = window.parent.document.querySelectorAll('button');
                 buttons.forEach(btn => {{
-                    if (btn.innerText.includes('SYSTEM_WIN_BRIDGE') || btn.innerText.includes('SYSTEM_STATE_BRIDGE')) {{
+                    if (btn.innerText.includes('SYSTEM_WIN_BRIDGE')) {{
                         const container = btn.closest('div[data-testid="stButton"]');
                         if (container) container.style.display = 'none';
                     }}
                 }});
-                sendStateToServer();
             }}
 
             function generateWinPatterns(size) {{
@@ -251,21 +245,6 @@ else:
             }}
 
             const winPatterns = generateWinPatterns(gridSize);
-
-            function sendStateToServer() {{
-                const cards = document.querySelectorAll('.bingo-card');
-                const checkedStates = Array.from(cards).map(card => card.classList.contains('checked'));
-                
-                const inputs = window.parent.document.querySelectorAll('input[type="text"]');
-                inputs.forEach(input => {{
-                    if (input.getAttribute('aria-label') === 'STATE_INPUT') {{
-                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype, "value").set;
-                        nativeInputValueSetter.call(input, JSON.stringify({{name: playerName, checked: checkedStates, id: mySessionId}}));
-                        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    }}
-                }});
-            }}
 
             function triggerWinEvent() {{
                 const buttons = window.parent.document.querySelectorAll('button');
@@ -308,8 +287,6 @@ else:
                     }}
                 }}
 
-                sendStateToServer();
-
                 if (isWin && !hasWon) {{
                     hasWon = true;
                     playVictorySound();
@@ -326,81 +303,7 @@ else:
 
         st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        sync_data = st.text_input("STATE_INPUT", key="state_input", label_visibility="collapsed")
-        if sync_data:
-            try:
-                data = json.loads(sync_data)
-                game_state["player_states"][data["id"]] = {"name": data["name"], "checked": data["checked"]}
-            except:
-                pass
-
         if st.button("SYSTEM_WIN_BRIDGE", key="win_bridge"):
             game_state["ended"] = True
             game_state["winner"] = player_name
             st.rerun()
-
-        # Rejestracja własnego stanu
-        if st.session_state["my_session_id"] not in game_state["player_states"]:
-            game_state["player_states"][st.session_state["my_session_id"]] = {"name": player_name, "checked": [False]*required_images}
-
-        # --- PEŁNY PODGLĄD PLANSZ PRECIWNIKÓW ---
-        other_players = {sid: pdata for sid, pdata in game_state["player_states"].items() if sid != st.session_state["my_session_id"]}
-        
-        if other_players:
-            st.markdown("---")
-            st.markdown("### 👥 Plansze innych graczy:")
-            
-            for sid, pdata in other_players.items():
-                st.markdown(f"**Gracz: {pdata['name']}**")
-                
-                opp_cards_html = ""
-                for idx, img_url in enumerate(encoded_images):
-                    is_checked = pdata["checked"][idx] if idx < len(pdata["checked"]) else False
-                    checked_class = "checked" if is_checked else ""
-                    opp_cards_html += f'<div class="opp-card {checked_class}"><img src="{img_url}"></div>'
-
-                opp_html = f"""
-                <style>
-                    .opp-container {{
-                        display: grid;
-                        grid-template-columns: repeat({grid_size}, 1fr);
-                        gap: 4px;
-                        width: 100%;
-                        max-width: 280px;
-                        margin-bottom: 15px;
-                    }}
-                    .opp-card {{
-                        position: relative;
-                        width: 100%;
-                        padding-top: 100%;
-                        border-radius: 6px;
-                        overflow: hidden;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                    }}
-                    .opp-card img {{
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        object-fit: cover;
-                    }}
-                    .opp-card.checked img {{
-                        filter: grayscale(80%) brightness(40%);
-                    }}
-                    .opp-card.checked::after {{
-                        content: "❌";
-                        position: absolute;
-                        top: 50%;
-                        left: 50%;
-                        transform: translate(-50%, -50%);
-                        font-size: 1.2rem;
-                        pointer-events: none;
-                    }}
-                </style>
-                <div class="opp-container">
-                    {opp_cards_html}
-                </div>
-                """
-                opp_height = 220 if grid_size == 3 else (260 if grid_size == 4 else 300)
-                st.components.v1.html(opp_html, height=opp_height, scrolling=False)
