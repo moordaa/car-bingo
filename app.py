@@ -212,6 +212,12 @@ else:
             const playerName = "{player_name}";
             const mySessionId = "{st.session_state['my_session_id']}";
 
+            // Zabezpieczenie przed przypadkowym odświeżeniem lub zamknięciem strony (np. przypadkowy gest swipe-down)
+            window.addEventListener('beforeunload', function (e) {{
+                e.preventDefault();
+                e.returnValue = '';
+            }});
+
             window.onload = function() {{
                 const buttons = window.parent.document.querySelectorAll('button');
                 buttons.forEach(btn => {{
