@@ -11,7 +11,7 @@ st.set_page_config(page_title="Auto Bingo", layout="wide")
 # Odświeżanie strony w tle co 3 sekundy (synchronizacja)
 st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
-# Ukrycie menu, stopki Streamlita, usunięcie górnego marginesu oraz stylizacja przycisków
+# Ukrycie menu, stopki Streamlita, usunięcie górnego marginesu oraz stylizacja kompaktowych przycisków
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -26,10 +26,11 @@ hide_streamlit_style = """
         padding-right: 1rem !important;
     }
     
-    /* Wymuszenie równego podziału i kwadratowego kształtu przycisków w poziomie */
+    /* Ograniczenie szerokości rzędu przycisków, aby były zgrabne i kwadratowe */
     div[data-testid="stHorizontalBlock"] {
         display: flex;
         width: 100%;
+        max-width: 400px;
         gap: 8px;
     }
     div[data-testid="stHorizontalBlock"] > div {
