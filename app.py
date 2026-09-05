@@ -9,8 +9,8 @@ from streamlit_autorefresh import st_autorefresh
 # Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
 
-# Lekkie, szybkie odświeżanie wyłącznie na wypadek zakończenia gry lub resetu (co 1.5 sekundy)
-st_autorefresh(interval=1500, limit=None, key="auto_refresh")
+# Lekkie odświeżanie wyłącznie dla natychmiastowej synchronizacji zdarzeń (co 1 sekunda)
+st_autorefresh(interval=1000, limit=None, key="auto_refresh")
 
 # Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
@@ -60,7 +60,7 @@ if "my_session_id" not in st.session_state:
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Generowanie planszy i kodowanie zdjęć w pamięci podręcznej (tylko przy zmianie gry)
+# Błyskawiczne keszowanie planszy w pamięci – zdjęcia generują się RAZ na rundę
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
@@ -139,7 +139,6 @@ st.write("")
 
 # --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
 if game_state["ended"]:
-    # Jeśli gra się skończyła, odtwórz dźwięk zwycięstwa na każdym telefonie, który właśnie to wykrył
     st.markdown(f"""
         <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px;">
             <h1 style="margin:0; font-size: 2.5rem;">🎉 BINGO! 🎉</h1>
@@ -147,7 +146,7 @@ if game_state["ended"]:
         </div>
         
         <script>
-            // Automatyczne powiadomienie głosowe u wszystkich graczy po wykryciu końca gry
+            // Powiadomienie głosowe u każdego gracza w momencie wykrycia wygranej
             if (!window.hasPlayedWinSpeech && 'speechSynthesis' in window) {{
                 window.hasPlayedWinSpeech = true;
                 const msg = new SpeechSynthesisUtterance('Bingo! Zwyciężył gracz {game_state["winner"]}!');
