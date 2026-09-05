@@ -53,7 +53,7 @@ else:
     # Wysokość komponentu HTML zależnie od rozmiaru
     html_height = 500 + (grid_size - 3) * 120
 
-    # Kod HTML, CSS i JavaScript z dynamiczną siatką i detekcją wygranej
+    # Kod HTML, CSS i JavaScript z dynamiczną siatką, detekcją wygranej oraz dźwiękiem
     html_code = f"""
     <style>
         .bingo-container {{
@@ -125,7 +125,7 @@ else:
         let hasWon = false;
         const gridSize = {grid_size};
 
-        // Generowanie wzorów wygrywających (poziome, pionowe, przekątne) dla dowolnego rozmiaru N x N
+        // Generowanie wzorów wygrywających (poziome, pionowe, przekątne)
         function generateWinPatterns(size) {{
             const patterns = [];
             
@@ -147,14 +147,13 @@ else:
                 patterns.push(col);
             }}
 
-            // Przekątna 1 (lewy górny -> prawy dolny)
+            // Przekątne
             const diag1 = [];
             for (let i = 0; i < size; i++) {{
                 diag1.push(i * size + i);
             }}
             patterns.push(diag1);
 
-            // Przekątna 2 (prawy górny -> lewy dolny)
             const diag2 = [];
             for (let i = 0; i < size; i++) {{
                 diag2.push(i * size + (size - 1 - i));
@@ -236,11 +235,22 @@ else:
 # Boczne menu z kodem QR do dołączania pasażerów
 with st.sidebar:
     st.header("📲 Kod QR dla pasażerów")
-    st.write("Wpisz link aplikacji, aby wygenerować kod QR:")
+    st.write("Wpisz dokładny, publiczny adres swojej aplikacji:")
     
-    app_url = st.text_input("Link do gry:", "https://car-bingo.streamlit.app")
+    # Podaj dokładny, publiczny URL swojej aplikacji Streamlit
+    default_url = "https://car-bingo.streamlit.app"
+    app_url = st.text_input("Link do gry:", default_url)
     
-    qr = qrcode.make(app_url)
+    # Generowanie kodu QR
+    qr = qrcode.QRCode(
+        version=1,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(app_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
     buf = BytesIO()
-    qr.save(buf)
-    st.image(buf.getvalue(), width=200)
+    img.save(buf)
+    st.image(buf.getvalue(), width=220)
