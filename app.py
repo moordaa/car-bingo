@@ -28,12 +28,19 @@ if os.path.exists(IMAGE_DIR):
 else:
     all_images = []
 
-if len(all_images) < 9:
-    st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Dodaj co najmniej 9 obrazków!")
+# Wybór rozmiaru planszy
+grid_choice = st.selectbox("Wybierz rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
+grid_size = int(grid_choice.split("x")[0])  # Pobiera 3, 4 lub 5
+required_images = grid_size * grid_size
+
+if len(all_images) < required_images:
+    st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz co najmniej {required_images} obrazków!")
 else:
-    # Losowanie nowej planszy
-    if st.button("🎲 Losuj nową planszę", use_container_width=True) or "bingo_grid" not in st.session_state:
-        st.session_state.bingo_grid = random.sample(all_images, 9)
+    # Losowanie nowej planszy przy zmianie rozmiaru lub po kliknięciu przycisku
+    if (st.button("🎲 Losuj nową planszę", use_container_width=True) or 
+        "bingo_grid" not in st.session_state or 
+        len(st.session_state.bingo_grid) != required_images):
+        st.session_state.bingo_grid = random.sample(all_images, required_images)
 
     # Konwersja zdjęć na base64 do wyświetlenia w HTML
     encoded_images = []
@@ -43,22 +50,25 @@ else:
             encoded = base64.b64encode(f.read()).decode()
             encoded_images.append(f"data:image/jpeg;base64,{encoded}")
 
-    # Kod HTML, CSS i JavaScript z generowaniem dźwięku fanfar i głosu
+    # Wysokość komponentu HTML zależnie od rozmiaru
+    html_height = 500 + (grid_size - 3) * 120
+
+    # Kod HTML, CSS i JavaScript z dynamiczną siatką i detekcją wygranej
     html_code = f"""
     <style>
         .bingo-container {{
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
+            grid-template-columns: repeat({grid_size}, 1fr);
+            gap: {6 if grid_size > 3 else 8}px;
             width: 100%;
-            max-width: 500px;
+            max-width: 550px;
             margin: auto;
         }}
         .bingo-card {{
             position: relative;
             width: 100%;
             padding-top: 100%;
-            border-radius: 12px;
+            border-radius: {8 if grid_size > 3 else 12}px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             cursor: pointer;
@@ -84,7 +94,7 @@ else:
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 3.5rem;
+            font-size: {2.2 if grid_size == 5 else (2.8 if grid_size == 4 else 3.5)}rem;
             pointer-events: none;
         }}
         #win-banner {{
@@ -113,14 +123,56 @@ else:
 
     <script>
         let hasWon = false;
+        const gridSize = {grid_size};
 
-        // Generator tonów dźwiękowych (fanfara wygranej)
+        // Generowanie wzorów wygrywających (poziome, pionowe, przekątne) dla dowolnego rozmiaru N x N
+        function generateWinPatterns(size) {{
+            const patterns = [];
+            
+            // Poziome
+            for (let r = 0; r < size; r++) {{
+                const row = [];
+                for (let c = 0; c < size; c++) {{
+                    row.push(r * size + c);
+                }}
+                patterns.push(row);
+            }}
+
+            // Pionowe
+            for (let c = 0; c < size; c++) {{
+                const col = [];
+                for (let r = 0; r < size; r++) {{
+                    col.push(r * size + c);
+                }}
+                patterns.push(col);
+            }}
+
+            // Przekątna 1 (lewy górny -> prawy dolny)
+            const diag1 = [];
+            for (let i = 0; i < size; i++) {{
+                diag1.push(i * size + i);
+            }}
+            patterns.push(diag1);
+
+            // Przekątna 2 (prawy górny -> lewy dolny)
+            const diag2 = [];
+            for (let i = 0; i < size; i++) {{
+                diag2.push(i * size + (size - 1 - i));
+            }}
+            patterns.push(diag2);
+
+            return patterns;
+        }}
+
+        const winPatterns = generateWinPatterns(gridSize);
+
+        // Generator tonów dźwiękowych i syntezy mowy
         function playVictorySound() {{
             try {{
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 const ctx = new AudioContext();
                 
-                const notes = [261.63, 329.63, 392.00, 523.25]; // Do-Mi-Sol-Do
+                const notes = [261.63, 329.63, 392.00, 523.25];
                 notes.forEach((freq, index) => {{
                     const osc = ctx.createOscillator();
                     const gain = ctx.createGain();
@@ -134,7 +186,6 @@ else:
                     osc.stop(ctx.currentTime + index * 0.12 + 0.3);
                 }});
 
-                // Lektor głosowy po odtworzeniu dźwięków
                 setTimeout(() => {{
                     if ('speechSynthesis' in window) {{
                         const msg = new SpeechSynthesisUtterance('Bingo! Mamy zwycięzcę!');
@@ -151,12 +202,6 @@ else:
         function checkBingo() {{
             const cards = document.querySelectorAll('.bingo-card');
             const checked = Array.from(cards).map(card => card.classList.contains('checked'));
-
-            const winPatterns = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Poziome
-                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Pionowe
-                [0, 4, 8], [2, 4, 6]             // Przekątne
-            ];
 
             let isWin = false;
             for (let pattern of winPatterns) {{
@@ -186,14 +231,14 @@ else:
     </script>
     """
 
-    st.components.v1.html(html_code, height=600, scrolling=False)
+    st.components.v1.html(html_code, height=html_height, scrolling=False)
 
 # Boczne menu z kodem QR do dołączania pasażerów
 with st.sidebar:
     st.header("📲 Kod QR dla pasażerów")
     st.write("Wpisz link aplikacji, aby wygenerować kod QR:")
     
-    app_url = st.text_input("Link do gry:", "https://fakturki-tejbrant.streamlit.app")
+    app_url = st.text_input("Link do gry:", "https://car-bingo.streamlit.app")
     
     qr = qrcode.make(app_url)
     buf = BytesIO()
