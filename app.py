@@ -4,6 +4,7 @@ import random
 import base64
 import qrcode
 from io import BytesIO
+import time
 
 st.set_page_config(page_title="Auto Bingo", layout="wide")
 
@@ -20,6 +21,18 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.title("🚗 Auto Bingo")
 
+# Centralny magazyn stanu wspólnej gry dla wszystkich podłączonych urządzeń
+@st.cache_resource
+def get_game_state():
+    return {
+        "grid_size": 3,
+        "winner": None,
+        "ended": False,
+        "game_id": 1  # Zwiększany przy resecie gry
+    }
+
+game_state = get_game_state()
+
 IMAGE_DIR = "images"
 
 # Pobieranie listy zdjęć z folderu
@@ -28,220 +41,237 @@ if os.path.exists(IMAGE_DIR):
 else:
     all_images = []
 
-# Wybór rozmiaru planszy
-grid_choice = st.selectbox("Wybierz rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
-grid_size = int(grid_choice.split("x")[0])  # Pobiera 3, 4 lub 5
+# --- PANEL GRACZA I LIDERA ---
+col1, col2 = st.columns([2, 1])
+with col1:
+    player_name = st.text_input("Twoje Imię / Nick:", value="Pasażer 1").strip()
+with col2:
+    is_master = st.checkbox("👑 Jestem Liderem (Master)")
+
+st.write("---")
+
+# Panel sterowania Lidera (Mastera)
+if is_master:
+    st.subheader("⚙️ Panel Lidera")
+    grid_choice = st.selectbox("Wybierz rozmiar planszy dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
+    new_grid_size = int(grid_choice.split("x")[0])
+
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("🚀 Uruchom / Resetuj grę dla wszystkich", use_container_width=True):
+            game_state["grid_size"] = new_grid_size
+            game_state["winner"] = None
+            game_state["ended"] = False
+            game_state["game_id"] += 1
+            st.rerun()
+
+grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
-if len(all_images) < required_images:
-    st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz co najmniej {required_images} obrazków!")
+# Sprawdzenie statusu gry (czy ktoś wygrał)
+if game_state["ended"]:
+    st.error(f"🛑 KONIEC GRY! Gracz **{game_state['winner']}** ułożył BINGO jako pierwszy!")
+    if is_master:
+        st.info("💡 Jako Lider kliknij wyżej 'Uruchom / Resetuj grę', aby rozpocząć nową rundę.")
 else:
-    # Losowanie nowej planszy przy zmianie rozmiaru lub po kliknięciu przycisku
-    if (st.button("🎲 Losuj nową planszę", use_container_width=True) or 
-        "bingo_grid" not in st.session_state or 
-        len(st.session_state.bingo_grid) != required_images):
-        st.session_state.bingo_grid = random.sample(all_images, required_images)
+    if len(all_images) < required_images:
+        st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz co najmniej {required_images} obrazków!")
+    else:
+        # Generowanie unikalnej planszy dla konkretnego gracza w bieżącej rundzie (game_id)
+        session_key = f"bingo_grid_{game_state['game_id']}"
+        if session_key not in st.session_state or len(st.session_state[session_key]) != required_images:
+            st.session_state[session_key] = random.sample(all_images, required_images)
 
-    # Konwersja zdjęć na base64 do wyświetlenia w HTML
-    encoded_images = []
-    for img_name in st.session_state.bingo_grid:
-        img_path = os.path.join(IMAGE_DIR, img_name)
-        with open(img_path, "rb") as f:
-            encoded = base64.b64encode(f.read()).decode()
-            encoded_images.append(f"data:image/jpeg;base64,{encoded}")
+        # Konwersja zdjęć na base64
+        encoded_images = []
+        for img_name in st.session_state[session_key]:
+            img_path = os.path.join(IMAGE_DIR, img_name)
+            with open(img_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode()
+                encoded_images.append(f"data:image/jpeg;base64,{encoded}")
 
-    # Wysokość komponentu HTML zależnie od rozmiaru
-    html_height = 500 + (grid_size - 3) * 120
+        html_height = 520 + (grid_size - 3) * 120
 
-    # Kod HTML, CSS i JavaScript z dynamiczną siatką, detekcją wygranej oraz dźwiękiem
-    html_code = f"""
-    <style>
-        .bingo-container {{
-            display: grid;
-            grid-template-columns: repeat({grid_size}, 1fr);
-            gap: {6 if grid_size > 3 else 8}px;
-            width: 100%;
-            max-width: 550px;
-            margin: auto;
-        }}
-        .bingo-card {{
-            position: relative;
-            width: 100%;
-            padding-top: 100%;
-            border-radius: {8 if grid_size > 3 else 12}px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            cursor: pointer;
-            user-select: none;
-            border: 3px solid transparent;
-            transition: border-color 0.3s;
-        }}
-        .bingo-card img {{
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: filter 0.2s;
-        }}
-        .bingo-card.checked img {{
-            filter: grayscale(80%) brightness(40%);
-        }}
-        .bingo-card.checked::after {{
-            content: "❌";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: {2.2 if grid_size == 5 else (2.8 if grid_size == 4 else 3.5)}rem;
-            pointer-events: none;
-        }}
-        #win-banner {{
-            display: none;
-            background-color: #28a745;
-            color: white;
-            text-align: center;
-            font-size: 1.8rem;
-            font-weight: bold;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-            animation: pop 0.4s ease-in-out;
-        }}
-        @keyframes pop {{
-            0% {{ transform: scale(0.8); opacity: 0; }}
-            100% {{ transform: scale(1); opacity: 1; }}
-        }}
-    </style>
-
-    <div id="win-banner">🎉 BINGO! WYGRANA! 🎉</div>
-
-    <div class="bingo-container">
-        {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
-    </div>
-
-    <script>
-        let hasWon = false;
-        const gridSize = {grid_size};
-
-        // Generowanie wzorów wygrywających (poziome, pionowe, przekątne)
-        function generateWinPatterns(size) {{
-            const patterns = [];
-            
-            // Poziome
-            for (let r = 0; r < size; r++) {{
-                const row = [];
-                for (let c = 0; c < size; c++) {{
-                    row.push(r * size + c);
-                }}
-                patterns.push(row);
+        # HTML / CSS / JS do obsługi planszy i wykrywania wygranej
+        html_code = f"""
+        <style>
+            .bingo-container {{
+                display: grid;
+                grid-template-columns: repeat({grid_size}, 1fr);
+                gap: {6 if grid_size > 3 else 8}px;
+                width: 100%;
+                max-width: 550px;
+                margin: auto;
             }}
+            .bingo-card {{
+                position: relative;
+                width: 100%;
+                padding-top: 100%;
+                border-radius: {8 if grid_size > 3 else 12}px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                cursor: pointer;
+                user-select: none;
+                border: 3px solid transparent;
+                transition: border-color 0.3s;
+            }}
+            .bingo-card img {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transition: filter 0.2s;
+            }}
+            .bingo-card.checked img {{
+                filter: grayscale(80%) brightness(40%);
+            }}
+            .bingo-card.checked::after {{
+                content: "❌";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: {2.2 if grid_size == 5 else (2.8 if grid_size == 4 else 3.5)}rem;
+                pointer-events: none;
+            }}
+            #win-banner {{
+                display: none;
+                background-color: #28a745;
+                color: white;
+                text-align: center;
+                font-size: 1.8rem;
+                font-weight: bold;
+                padding: 12px;
+                border-radius: 10px;
+                margin-bottom: 12px;
+                animation: pop 0.4s ease-in-out;
+            }}
+            @keyframes pop {{
+                0% {{ transform: scale(0.8); opacity: 0; }}
+                100% {{ transform: scale(1); opacity: 1; }}
+            }}
+        </style>
 
-            // Pionowe
-            for (let c = 0; c < size; c++) {{
-                const col = [];
+        <div id="win-banner">🎉 BINGO! WYGRANA! 🎉</div>
+
+        <div class="bingo-container">
+            {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
+        </div>
+
+        <script>
+            let hasWon = false;
+            const gridSize = {grid_size};
+
+            function generateWinPatterns(size) {{
+                const patterns = [];
                 for (let r = 0; r < size; r++) {{
-                    col.push(r * size + c);
+                    const row = [];
+                    for (let c = 0; c < size; c++) row.push(r * size + c);
+                    patterns.push(row);
                 }}
-                patterns.push(col);
+                for (let c = 0; c < size; c++) {{
+                    const col = [];
+                    for (let r = 0; r < size; r++) col.push(r * size + c);
+                    patterns.push(col);
+                }}
+                const diag1 = [];
+                for (let i = 0; i < size; i++) diag1.push(i * size + i);
+                patterns.push(diag1);
+
+                const diag2 = [];
+                for (let i = 0; i < size; i++) diag2.push(i * size + (size - 1 - i));
+                patterns.push(diag2);
+
+                return patterns;
             }}
 
-            // Przekątne
-            const diag1 = [];
-            for (let i = 0; i < size; i++) {{
-                diag1.push(i * size + i);
+            const winPatterns = generateWinPatterns(gridSize);
+
+            function playVictorySound() {{
+                try {{
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new AudioContext();
+                    const notes = [261.63, 329.63, 392.00, 523.25];
+                    notes.forEach((freq, index) => {{
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime + index * 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + index * 0.12 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + index * 0.12);
+                        osc.stop(ctx.currentTime + index * 0.12 + 0.3);
+                    }});
+
+                    setTimeout(() => {{
+                        if ('speechSynthesis' in window) {{
+                            const msg = new SpeechSynthesisUtterance('Bingo! Mamy zwycięzcę!');
+                            msg.lang = 'pl-PL';
+                            msg.rate = 1.0;
+                            window.speechSynthesis.speak(msg);
+                        }}
+                    }}, 600);
+                }} catch(e) {{
+                    console.log("Dźwięk wyłączony.");
+                }}
             }}
-            patterns.push(diag1);
 
-            const diag2 = [];
-            for (let i = 0; i < size; i++) {{
-                diag2.push(i * size + (size - 1 - i));
-            }}
-            patterns.push(diag2);
+            function checkBingo() {{
+                const cards = document.querySelectorAll('.bingo-card');
+                const checked = Array.from(cards).map(card => card.classList.contains('checked'));
 
-            return patterns;
-        }}
-
-        const winPatterns = generateWinPatterns(gridSize);
-
-        // Generator tonów dźwiękowych i syntezy mowy
-        function playVictorySound() {{
-            try {{
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const ctx = new AudioContext();
-                
-                const notes = [261.63, 329.63, 392.00, 523.25];
-                notes.forEach((freq, index) => {{
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.value = freq;
-                    gain.gain.setValueAtTime(0.3, ctx.currentTime + index * 0.12);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + index * 0.12 + 0.3);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(ctx.currentTime + index * 0.12);
-                    osc.stop(ctx.currentTime + index * 0.12 + 0.3);
-                }});
-
-                setTimeout(() => {{
-                    if ('speechSynthesis' in window) {{
-                        const msg = new SpeechSynthesisUtterance('Bingo! Mamy zwycięzcę!');
-                        msg.lang = 'pl-PL';
-                        msg.rate = 1.0;
-                        window.speechSynthesis.speak(msg);
+                let isWin = false;
+                for (let pattern of winPatterns) {{
+                    if (pattern.every(index => checked[index])) {{
+                        isWin = true;
+                        break;
                     }}
-                }}, 600);
-            }} catch(e) {{
-                console.log("Dźwięk wyłączony lub zablokowany przez przeglądarkę.");
-            }}
-        }}
-
-        function checkBingo() {{
-            const cards = document.querySelectorAll('.bingo-card');
-            const checked = Array.from(cards).map(card => card.classList.contains('checked'));
-
-            let isWin = false;
-            for (let pattern of winPatterns) {{
-                if (pattern.every(index => checked[index])) {{
-                    isWin = true;
-                    break;
                 }}
-            }}
 
-            const banner = document.getElementById('win-banner');
-            if (isWin) {{
-                banner.style.display = 'block';
-                if (!hasWon) {{
+                const banner = document.getElementById('win-banner');
+                if (isWin && !hasWon) {{
                     hasWon = true;
+                    banner.style.display = 'block';
                     playVictorySound();
+                    
+                    window.parent.postMessage({{
+                        type: 'streamlit:setComponentValue',
+                        value: true
+                    }}, '*');
                 }}
-            }} else {{
-                banner.style.display = 'none';
-                hasWon = false;
             }}
-        }}
 
-        function toggleCard(card) {{
-            card.classList.toggle('checked');
-            checkBingo();
-        }}
-    </script>
-    """
+            function toggleCard(card) {{
+                card.classList.toggle('checked');
+                checkBingo();
+            }}
+        </script>
+        """
 
-    st.components.v1.html(html_code, height=html_height, scrolling=False)
+        winner_signal = st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-# Boczne menu z kodem QR do dołączania pasażerów
+        # Rejestracja wygranej
+        if winner_signal:
+            game_state["ended"] = True
+            game_state["winner"] = player_name
+            st.rerun()
+
+    # Automatyczne odświeżanie w tle co 3 sekundy
+    time.sleep(3)
+    st.rerun()
+
+# Boczne menu z kodem QR
 with st.sidebar:
     st.header("📲 Kod QR dla pasażerów")
     st.write("Wpisz dokładny, publiczny adres swojej aplikacji:")
     
-    # Podaj dokładny, publiczny URL swojej aplikacji Streamlit
     default_url = "https://car-bingo.streamlit.app"
     app_url = st.text_input("Link do gry:", default_url)
     
-    # Generowanie kodu QR
     qr = qrcode.QRCode(
         version=1,
         box_size=10,
