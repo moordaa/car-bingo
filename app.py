@@ -21,14 +21,14 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.title("🚗 Auto Bingo")
 
-# Centralny magazyn stanu wspólnej gry dla wszystkich podłączonych urządzeń
+# Centralny magazyn stanu wspólnej gry w pamięci serwera
 @st.cache_resource
 def get_game_state():
     return {
         "grid_size": 3,
         "winner": None,
         "ended": False,
-        "game_id": 1  # Zwiększany przy resecie gry
+        "game_id": 1
     }
 
 game_state = get_game_state()
@@ -56,14 +56,13 @@ if is_master:
     grid_choice = st.selectbox("Wybierz rozmiar planszy dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
     new_grid_size = int(grid_choice.split("x")[0])
 
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        if st.button("🚀 Uruchom / Resetuj grę dla wszystkich", use_container_width=True):
-            game_state["grid_size"] = new_grid_size
-            game_state["winner"] = None
-            game_state["ended"] = False
-            game_state["game_id"] += 1
-            st.rerun()
+    if st.button("🚀 Uruchom / Resetuj grę dla wszystkich", use_container_width=True):
+        game_state["grid_size"] = new_grid_size
+        game_state["winner"] = None
+        game_state["ended"] = False
+        game_state["game_id"] += 1
+        st.success("Gra została zresetowana!")
+        st.rerun()
 
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
@@ -77,14 +76,16 @@ else:
     if len(all_images) < required_images:
         st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz co najmniej {required_images} obrazków!")
     else:
-        # Generowanie unikalnej planszy dla konkretnego gracza w bieżącej rundzie (game_id)
-        session_key = f"bingo_grid_{game_state['game_id']}"
-        if session_key not in st.session_state or len(st.session_state[session_key]) != required_images:
-            st.session_state[session_key] = random.sample(all_images, required_images)
+        # Generowanie nowej, unikalnej planszy przy zmianie id_gry (game_id)
+        current_game_id = game_state["game_id"]
+        
+        if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
+            st.session_state["current_game_id"] = current_game_id
+            st.session_state["bingo_grid"] = random.sample(all_images, required_images)
 
-        # Konwersja zdjęć na base64
+        # Konwersja zdjęć na base64 do wysłania do widoku HTML
         encoded_images = []
-        for img_name in st.session_state[session_key]:
+        for img_name in st.session_state["bingo_grid"]:
             img_path = os.path.join(IMAGE_DIR, img_name)
             with open(img_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode()
@@ -92,7 +93,7 @@ else:
 
         html_height = 520 + (grid_size - 3) * 120
 
-        # HTML / CSS / JS do obsługi planszy i wykrywania wygranej
+        # Kod HTML / CSS / JS do obsługi siatki i weryfikacji wygranej
         html_code = f"""
         <style>
             .bingo-container {{
@@ -254,7 +255,7 @@ else:
 
         winner_signal = st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        # Rejestracja wygranej
+        # Rejestracja wygranej po odebraniu sygnału
         if winner_signal:
             game_state["ended"] = True
             game_state["winner"] = player_name
