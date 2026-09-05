@@ -6,57 +6,23 @@ import qrcode
 from io import BytesIO
 from streamlit_autorefresh import st_autorefresh
 
-st.set_page_config(page_title="Auto Bingo", layout="wide")
+# Ustawienie "centered" wygląda o wiele schludniej na telefonach niż "wide"
+st.set_page_config(page_title="Auto Bingo", layout="centered")
 
 # Odświeżanie strony w tle co 3 sekundy (synchronizacja)
 st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
-# Wymuszenie poziomego rzędu na telefonach, usunięcie marginesów i wymuszenie kwadratów
+# Ukrycie paska menu, stopki i maksymalne dosunięcie do góry bez psucia mobilnego interfejsu
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
-    /* Usunięcie marginesów by dosunąć wszystko do samej góry */
     .block-container {
-        padding-top: 0.2rem !important;
-        padding-bottom: 0.5rem !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 1rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
-    }
-    
-    /* BLOKADA ZACHOWANIA MOBILNEGO: Wymuszenie poziomej linii na telefonach */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 6px !important;
-        width: 100% !important;
-        max-width: 500px !important;
-    }
-    
-    /* Wymuszenie, aby każda z 4 kolumn zajmowała dokładnie 25% szerokości ekranu telefonu */
-    div[data-testid="column"] {
-        width: 25% !important;
-        flex: 1 1 25% !important;
-        min-width: 0 !important;
-    }
-    
-    /* Kształt przycisków: idealne kwadraty z wycentrowanym tekstem */
-    .stButton > button {
-        aspect-ratio: 1 / 1 !important;
-        width: 100% !important;
-        height: auto !important;
-        padding: 0px !important;
-        font-size: 0.85rem !important;
-        font-weight: bold !important;
-        line-height: 1.2 !important;
-        border-radius: 12px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        align-items: center !important;
     }
     </style>
 """
@@ -90,105 +56,63 @@ if "my_session_id" not in st.session_state:
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-for key in ["show_qr", "show_settings", "show_reset"]:
-    if key not in st.session_state:
-        st.session_state[key] = False
+# Schludny, wycentrowany tytuł
+st.markdown("<h2 style='text-align: center; margin-top: 0; padding-top: 0;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
-# Tytuł aplikacji przesunięty na samą górę
-st.markdown("<h1 style='margin-top: 0px; padding-top: 0px; text-align: center;'>🚗 Auto Bingo</h1>", unsafe_allow_html=True)
-
-player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
-st.session_state["player_name"] = player_name
-
-# --- PASEK STEROWANIA: 4 KWADRATOWE PRZYCISKI W POZIOMEJ LINII NA TELEFONIE ---
-col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-
-with col_b1:
-    if st.button("📱\nQR", use_container_width=True):
-        st.session_state["show_qr"] = not st.session_state["show_qr"]
-        st.session_state["show_settings"] = False
-        st.session_state["show_reset"] = False
-        st.rerun()
-
-with col_b2:
+# --- MINIMALISTYCZNE MENU ZWIJANE ---
+# Wszystkie opcje sterowania i QR są schowane w jednym elemencie
+with st.expander("⚙️ Menu Gry (QR, Lider, Reset)", expanded=False):
+    
+    st.markdown("**📱 Kod QR dla pasażerów:**")
+    qr = qrcode.QRCode(version=1, box_size=6, border=1)
+    qr.add_data(RENDER_APP_URL)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf)
+    st.image(buf.getvalue(), width=160)
+    
+    st.write("---")
+    
     is_current_master = (game_state["master_session"] == st.session_state["my_session_id"])
-    btn_label = "👑\nLider" if not is_current_master else "❌\nOddaj"
-    if st.button(btn_label, use_container_width=True):
-        if not is_current_master:
-            game_state["master_session"] = st.session_state["my_session_id"]
-        else:
-            game_state["master_session"] = None
+    master_toggle = st.checkbox("👑 Jestem Liderem", value=is_current_master)
+    
+    # Logika przejmowania statusu lidera
+    if master_toggle and not is_current_master:
+        game_state["master_session"] = st.session_state["my_session_id"]
         st.rerun()
-
-with col_b3:
-    if st.button("⚙️\nPlansza", use_container_width=True):
-        st.session_state["show_settings"] = not st.session_state["show_settings"]
-        st.session_state["show_qr"] = False
-        st.session_state["show_reset"] = False
+    elif not master_toggle and is_current_master:
+        game_state["master_session"] = None
         st.rerun()
-
-with col_b4:
-    if st.button("🚀\nReset", use_container_width=True):
-        st.session_state["show_reset"] = not st.session_state["show_reset"]
-        st.session_state["show_qr"] = False
-        st.session_state["show_settings"] = False
-        st.rerun()
-
-is_master = is_current_master
-
-# --- ROZWIJANE PANELE ---
-
-if st.session_state["show_qr"]:
-    st.markdown("""
-        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center; margin-top: 10px; border: 1px solid #ddd;">
-            <strong>Zeskanuj kod, aby dołączyć do gry:</strong>
-        </div>
-    """, unsafe_allow_html=True)
-    q1, q2, q3 = st.columns([1, 2, 1])
-    with q2:
-        qr = qrcode.QRCode(version=1, box_size=8, border=2)
-        qr.add_data(RENDER_APP_URL)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        buf = BytesIO()
-        img.save(buf)
-        st.image(buf.getvalue(), width=200)
-        st.caption(f"Link: {RENDER_APP_URL}")
-
-if st.session_state["show_settings"]:
-    st.markdown("### ⚙️ Wybór wielkości planszy")
-    if is_master:
-        grid_choice = st.selectbox("Wybierz planszę dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], key="grid_select_box")
+        
+    # Opcje widoczne tylko dla Lidera
+    if is_current_master:
+        st.write("---")
+        grid_choice = st.selectbox("Rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
         new_size = int(grid_choice.split("x")[0])
-        if new_size != game_state["grid_size"]:
+        
+        if st.button("🚀 Zresetuj grę dla wszystkich", use_container_width=True, type="primary"):
             game_state["grid_size"] = new_size
-            game_state["game_id"] += 1
-            st.rerun()
-    else:
-        st.warning("⚠️ Tylko aktualny Lider (Master) może zmieniać wielkość planszy!")
-
-if st.session_state["show_reset"]:
-    st.markdown("### 🚀 Resetowanie gry")
-    if is_master:
-        if st.button("Potwierdź i zresetuj grę dla wszystkich", type="primary", use_container_width=True):
             game_state["winner"] = None
             game_state["ended"] = False
             game_state["game_id"] += 1
-            st.session_state["show_reset"] = False
             st.rerun()
-    else:
-        st.warning("⚠️ Tylko aktualny Lider (Master) może zresetować grę!")
 
-st.write("---")
+# --- POLE NA IMIĘ TUŻ NAD PLANSZĄ ---
+player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
+st.session_state["player_name"] = player_name
 
+st.write("") # Drobny odstęp przed planszą
+
+# --- LOGIKA GRY (BEZ ZMIAN) ---
+is_master = (game_state["master_session"] == st.session_state["my_session_id"])
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
-# --- LOGIKA GRY ---
 if game_state["ended"]:
     st.error(f"🛑 KONIEC GRY! Gracz **{game_state['winner']}** ułożył BINGO jako pierwszy!")
     if is_master:
-        st.info("💡 Liderze, możesz zresetować grę przyciskiem wyżej.")
+        st.info("💡 Liderze, rozwiń Menu Gry u góry i zresetuj planszę.")
 else:
     if len(all_images) < required_images:
         st.warning(f"W folderze 'images' masz tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzeba min. {required_images}!")
