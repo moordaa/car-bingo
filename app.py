@@ -55,10 +55,11 @@ with col2:
 
 st.write("---")
 
-# --- KOD QR BEZPOŚREDNIO NA EKRANIE Z PARAMETREM EMBEDDED ---
+# --- KOD QR NA GŁÓWNYM EKRANIE ---
 with st.expander("📲 Pokaż kod QR do wspólnej gry dla pasażerów", expanded=False):
     st.write("Zeskanuj ten kod telefonem pasażera:")
-    app_url = st.text_input("Link do gry:", "https://car-bingo.streamlit.app/?embedded=true", key="main_qr_url")
+    # Tutaj wklej swój nowy adres z Render.com (zastąp poniższy link swoim)
+    app_url = st.text_input("Link do gry:", "https://car-bingo.onrender.com", key="main_qr_url")
     
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
     qr.add_data(app_url)
@@ -112,7 +113,7 @@ else:
         # Wysokość dopasowana do siatki
         html_height = 800 if grid_size == 3 else (1000 if grid_size == 4 else 1200)
 
-        # KOD HTML/JS - Obsługa kliknięć, banera wygranej i głosu z imieniem
+        # KOD HTML/JS - Pełna obsługa dźwięku, banera i imienia zwycięzcy
         html_code = f"""
         <style>
             .bingo-container {{
@@ -292,7 +293,7 @@ else:
 # --- BOCZNE MENU ---
 with st.sidebar:
     st.header("📲 Szybki QR")
-    app_url_sidebar = st.text_input("Link:", "https://car-bingo.streamlit.app/?embedded=true", key="sidebar_url")
+    app_url_sidebar = st.text_input("Link:", "https://car-bingo.onrender.com", key="sidebar_url")
     qr_s = qrcode.QRCode(version=1, box_size=8, border=2)
     qr_s.add_data(app_url_sidebar)
     qr_s.make(fit=True)
