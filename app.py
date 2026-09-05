@@ -74,7 +74,7 @@ if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encode
 
 st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
-# --- KOLEJNOŚĆ INTERFEJSU OD GÓRY (ZGODNIE Z WYTYCZNYMI) ---
+# --- INTERFEJS OD GÓRY ---
 
 # 1. QR Code
 with st.expander("📲 Pokaż kod QR", expanded=False):
@@ -256,15 +256,13 @@ else:
                 const cards = document.querySelectorAll('.bingo-card');
                 const checkedStates = Array.from(cards).map(card => card.classList.contains('checked'));
                 
-                const buttons = window.parent.document.querySelectorAll('button');
-                buttons.forEach(btn => {{
-                    if (btn.innerText.includes('SYSTEM_STATE_BRIDGE')) {{
-                        const inputField = window.parent.document.querySelector('input[aria-label="STATE_INPUT"]');
-                        if (inputField) {{
-                            nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype, "value").set;
-                            nativeInputValueSetter.call(inputField, JSON.stringify({{name: playerName, checked: checkedStates, id: mySessionId}}));
-                            inputField.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        }}
+                const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+                inputs.forEach(input => {{
+                    if (input.getAttribute('aria-label') === 'STATE_INPUT') {{
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype, "value").set;
+                        nativeInputValueSetter.call(input, JSON.stringify({{name: playerName, checked: checkedStates, id: mySessionId}}));
+                        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
                     }}
                 }});
             }}
@@ -345,7 +343,7 @@ else:
         if st.session_state["my_session_id"] not in game_state["player_states"]:
             game_state["player_states"][st.session_state["my_session_id"]] = {"name": player_name, "checked": [False]*required_images}
 
-        # --- PEŁNY PODGLĄD PLANSZ PRECIWNIKÓW Z PRZYCISKIEM ODŚWIEŻANIA ---
+        # --- PEŁNY PODGLĄD PLANSZ PRECIWNIKÓW ---
         other_players = {sid: pdata for sid, pdata in game_state["player_states"].items() if sid != st.session_state["my_session_id"]}
         
         if other_players:
