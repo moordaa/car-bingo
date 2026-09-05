@@ -4,8 +4,12 @@ import random
 import base64
 import qrcode
 from io import BytesIO
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Auto Bingo", layout="wide")
+
+# Bezinwazyjne odświeżanie w tle co 2.5 sekundy (pozwala innym graczom zobaczyć wygraną)
+st_autorefresh(interval=2500, limit=None, key="auto_refresh")
 
 # Ukrycie paska nagłówka i stopki Streamlita
 hide_streamlit_style = """
@@ -43,9 +47,12 @@ else:
 # --- PANEL GRACZA I LIDERA ---
 col1, col2 = st.columns([2, 1])
 with col1:
-    player_name = st.text_input("Twoje Imię / Nick:", value="Pasażer 1").strip()
+    if "player_name" not in st.session_state:
+        st.session_state["player_name"] = "Pasażer 1"
+    player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
+    st.session_state["player_name"] = player_name
 with col2:
-    is_master = st.checkbox("👑 Jestem Liderem (Master)")
+    is_master = st.checkbox("👑 Jestem Liderem")
 
 st.write("---")
 
@@ -55,12 +62,11 @@ if is_master:
     grid_choice = st.selectbox("Wybierz rozmiar planszy dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
     new_grid_size = int(grid_choice.split("x")[0])
 
-    if st.button("🚀 Uruchom / Resetuj grę dla wszystkich", use_container_width=True):
+    if st.button("🚀 Zresetuj grę i losuj nową planszę", use_container_width=True, type="primary"):
         game_state["grid_size"] = new_grid_size
         game_state["winner"] = None
         game_state["ended"] = False
         game_state["game_id"] += 1
-        st.success("Gra została zresetowana!")
         st.rerun()
 
 grid_size = game_state["grid_size"]
@@ -68,16 +74,16 @@ required_images = grid_size * grid_size
 
 # Sprawdzenie statusu gry (czy ktoś wygrał)
 if game_state["ended"]:
-    st.error(f"🛑 KONIEC GRY! Gracz **{game_state['winner']}** ułożył BINGO jako pierwszy!")
+    st.error(f"🛑 KONIEC GRY! Gracz **{game_state['winner']}** zgłosił BINGO jako pierwszy!")
     if is_master:
-        st.info("💡 Jako Lider kliknij wyżej 'Uruchom / Resetuj grę', aby rozpocząć nową rundę.")
+        st.info("💡 Jako Lider kliknij wyżej 'Zresetuj grę', aby rozpocząć nową rundę.")
 else:
     if len(all_images) < required_images:
         st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz co najmniej {required_images} obrazków!")
     else:
         current_game_id = game_state["game_id"]
         
-        # Generowanie nowej planszy jeśli gra została zresetowana przez Lidera
+        # Generowanie nowej planszy tylko, gdy Lider wymusił zmianę id gry
         if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
             st.session_state["current_game_id"] = current_game_id
             st.session_state["bingo_grid"] = random.sample(all_images, required_images)
@@ -90,9 +96,9 @@ else:
                 encoded = base64.b64encode(f.read()).decode()
                 encoded_images.append(f"data:image/jpeg;base64,{encoded}")
 
-        html_height = 520 + (grid_size - 3) * 120
+        html_height = 420 + (grid_size - 3) * 110
 
-        # Kod HTML / CSS / JS do obsługi siatki i weryfikacji wygranej
+        # Kod HTML / CSS / JS do obsługi planszy
         html_code = f"""
         <style>
             .bingo-container {{
@@ -141,7 +147,7 @@ else:
                 background-color: #28a745;
                 color: white;
                 text-align: center;
-                font-size: 1.8rem;
+                font-size: 1.4rem;
                 font-weight: bold;
                 padding: 12px;
                 border-radius: 10px;
@@ -154,7 +160,7 @@ else:
             }}
         </style>
 
-        <div id="win-banner">🎉 BINGO! WYGRANA! 🎉</div>
+        <div id="win-banner">🎉 BINGO! ZGŁOŚ TO PRZYCISKIEM PONIŻEJ 👇 🎉</div>
 
         <div class="bingo-container">
             {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
@@ -209,7 +215,7 @@ else:
 
                     setTimeout(() => {{
                         if ('speechSynthesis' in window) {{
-                            const msg = new SpeechSynthesisUtterance('Bingo! Mamy zwycięzcę!');
+                            const msg = new SpeechSynthesisUtterance('Mamy linię! Kliknij przycisk zgłoś Bingo!');
                             msg.lang = 'pl-PL';
                             msg.rate = 1.0;
                             window.speechSynthesis.speak(msg);
@@ -237,11 +243,9 @@ else:
                     hasWon = true;
                     banner.style.display = 'block';
                     playVictorySound();
-                    
-                    window.parent.postMessage({{
-                        type: 'streamlit:setComponentValue',
-                        value: true
-                    }}, '*');
+                }} else if (!isWin) {{
+                    hasWon = false;
+                    banner.style.display = 'none';
                 }}
             }}
 
@@ -252,15 +256,15 @@ else:
         </script>
         """
 
-        winner_signal = st.components.v1.html(html_code, height=html_height, scrolling=False)
+        st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        # Rejestracja wygranej
-        if winner_signal:
+        # Nowy, fizyczny przycisk do zakomunikowania serwerowi o wygranej (działa 100% niezawodnie)
+        if st.button("🏆 ZGŁOŚ BINGO!", type="primary", use_container_width=True):
             game_state["ended"] = True
             game_state["winner"] = player_name
             st.rerun()
 
-# Boczne menu z kodem QR
+# Boczne menu z kodem QR do dołączania
 with st.sidebar:
     st.header("📲 Kod QR dla pasażerów")
     st.write("Wpisz dokładny, publiczny adres swojej aplikacji:")
