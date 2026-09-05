@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Auto Bingo", layout="wide")
 
-# Odświeżanie strony w tle co 3 sekundy (synchronizacja resetu Lidera)
+# Odświeżanie strony w tle co 3 sekundy (synchronizacja)
 st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
 # Ukrycie menu, stopki Streamlita i marginesów
@@ -22,85 +22,134 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Stały, poprawny adres Twojej aplikacji na Render.com
+# Stały, poprawny adres aplikacji na Render.com
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Wspólna pamięć dla wszystkich telefonów w aucie
+# Wspólna pamięć dla wszystkich w aucie
 @st.cache_resource
 def get_game_state():
     return {
         "grid_size": 3,
         "winner": None,
         "ended": False,
-        "game_id": 1
+        "game_id": 1,
+        "master_session": None  # Śledzi unikalnego Lidera
     }
 
 game_state = get_game_state()
 IMAGE_DIR = "images"
 
-# Odczyt folderu ze zdjęciami
 if os.path.exists(IMAGE_DIR):
     all_images = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
 else:
     all_images = []
 
-# Inicjalizacja stanu widoczności kodu QR
-if "show_qr" not in st.session_state:
-    st.session_state["show_qr"] = False
+# Identyfikacja sesji gracza
+if "my_session_id" not in st.session_state:
+    st.session_state["my_session_id"] = str(random.randint(100000, 999999))
 
-# Górny nagłówek z przyciskiem QR w jednej linii na samej górze
-col_title, col_btn = st.columns([5, 1])
-with col_title:
-    st.markdown("<h1 style='padding-top: 0px; margin-top: 0px;'>🚗 Auto Bingo</h1>", unsafe_allow_html=True)
-with col_btn:
-    if st.button("📱 QR", use_container_width=True, type="secondary"):
+if "player_name" not in st.session_state:
+    st.session_state["player_name"] = "Pasażer 1"
+
+# Inicjalizacja stanów zakładek
+for key in ["show_qr", "show_master", "show_settings", "show_reset"]:
+    if key not in st.session_state:
+        st.session_state[key] = False
+
+# Tytuł aplikacji
+st.title("🚗 Auto Bingo")
+
+# Pole na imię gracza
+player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
+st.session_state["player_name"] = player_name
+
+# --- PASEK STEROWANIA: KWADRATOWE PRZYCISKI W JEDNEJ LINII ---
+col_b1, col_b2, col_b3, col_b4, col_space = st.columns([1, 1, 1, 1, 4])
+
+with col_b1:
+    if st.button("📱\nQR", use_container_width=True):
         st.session_state["show_qr"] = not st.session_state["show_qr"]
+        st.session_state["show_master"] = False
+        st.session_state["show_settings"] = False
+        st.session_state["show_reset"] = False
         st.rerun()
 
-# Wyświetlanie kodu QR po kliknięciu ikonki
+with col_b2:
+    is_current_master = (game_state["master_session"] == st.session_state["my_session_id"])
+    btn_label = "👑\nLider" if not is_current_master else "❌\nOddaj"
+    if st.button(btn_label, use_container_width=True):
+        if not is_current_master:
+            game_state["master_session"] = st.session_state["my_session_id"]
+        else:
+            game_state["master_session"] = None
+        st.rerun()
+
+with col_b3:
+    if st.button("⚙️\nPlansza", use_container_width=True):
+        st.session_state["show_settings"] = not st.session_state["show_settings"]
+        st.session_state["show_qr"] = False
+        st.session_state["show_master"] = False
+        st.session_state["show_reset"] = False
+        st.rerun()
+
+with col_b4:
+    if st.button("🚀\nReset", use_container_width=True):
+        st.session_state["show_reset"] = not st.session_state["show_reset"]
+        st.session_state["show_qr"] = False
+        st.session_state["show_master"] = False
+        st.session_state["show_settings"] = False
+        st.rerun()
+
+# Sprawdzenie czy aktualny użytkownik jest liderem
+is_master = is_current_master
+
+# --- ROZWIJANE PANELE POD PRZYCISKAMI ---
+
+# 1. Panel QR
 if st.session_state["show_qr"]:
     st.markdown("""
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 1px solid #ddd;">
-            <p style="color: #333; font-weight: bold; margin-bottom: 8px;">Zeskanuj kod, aby dołączyć do gry:</p>
+        <div style="background-color: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center; margin-top: 10px; border: 1px solid #ddd;">
+            <strong>Zeskanuj kod, aby dołączyć do gry:</strong>
         </div>
     """, unsafe_allow_html=True)
-    
-    col_q1, col_q2, col_q3 = st.columns([1, 2, 1])
-    with col_q2:
+    q1, q2, q3 = st.columns([1, 2, 1])
+    with q2:
         qr = qrcode.QRCode(version=1, box_size=8, border=2)
         qr.add_data(RENDER_APP_URL)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
-        
         buf = BytesIO()
         img.save(buf)
-        st.image(buf.getvalue(), width=220)
+        st.image(buf.getvalue(), width=200)
         st.caption(f"Link: {RENDER_APP_URL}")
 
-# --- IDENTYFIKACJA GRACZA ---
-col1, col2 = st.columns([2, 1])
-with col1:
-    if "player_name" not in st.session_state:
-        st.session_state["player_name"] = "Pasażer 1"
-    player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
-    st.session_state["player_name"] = player_name
-with col2:
-    is_master = st.checkbox("👑 Lider (Master)")
+# 2. Panel wyboru wielkości planszy (dostępny dla Lidera)
+if st.session_state["show_settings"]:
+    st.markdown("### ⚙️ Wybór wielkości planszy")
+    if is_master:
+        grid_choice = st.selectbox("Wybierz planszę dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], key="grid_select_box")
+        new_size = int(grid_choice.split("x")[0])
+        if new_size != game_state["grid_size"]:
+            game_state["grid_size"] = new_size
+            game_state["game_id"] += 1
+            st.rerun()
+    else:
+        st.warning("⚠️ Tylko aktualny Lider (Master) może zmieniać wielkość planszy!")
+
+# 3. Panel resetu gry (dostępny dla Lidera)
+if st.session_state["show_reset"]:
+    st.markdown("### 🚀 Resetowanie gry")
+    if is_master:
+        if st.button("Potwierdź i zresetuj grę dla wszystkich", type="primary", use_container_width=True):
+            game_state["winner"] = None
+            game_state["ended"] = False
+            game_state["game_id"] += 1
+            st.session_state["show_reset"] = False
+            st.rerun()
+    else:
+        st.warning("⚠️ Tylko aktualny Lider (Master) może zresetować grę!")
 
 st.write("---")
-
-# --- PANEL LIDERA (RESET GRY) ---
-if is_master:
-    st.subheader("⚙️ Panel Lidera")
-    grid_choice = st.selectbox("Wybierz rozmiar planszy dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
-    new_grid_size = int(grid_choice.split("x")[0])
-
-    if st.button("🚀 Zresetuj grę i rozdaj nowe plansze", use_container_width=True, type="primary"):
-        game_state["grid_size"] = new_grid_size
-        game_state["winner"] = None
-        game_state["ended"] = False
-        game_state["game_id"] += 1
-        st.rerun()
 
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
@@ -109,10 +158,10 @@ required_images = grid_size * grid_size
 if game_state["ended"]:
     st.error(f"🛑 KONIEC GRY! Gracz **{game_state['winner']}** ułożył BINGO jako pierwszy!")
     if is_master:
-        st.info("💡 Liderze, zresetuj grę wyżej, by zacząć od nowa.")
+        st.info("💡 Liderze, możesz zresetować grę przyciskiem wyżej.")
 else:
     if len(all_images) < required_images:
-        st.warning(f"W folderze 'images' masz tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz min. {required_images}!")
+        st.warning(f"W folderze 'images' masz tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzeba min. {required_images}!")
     else:
         current_game_id = game_state["game_id"]
         
@@ -303,14 +352,3 @@ else:
             game_state["ended"] = True
             game_state["winner"] = player_name
             st.rerun()
-
-# --- BOCZNY QR (DODATKOWO) ---
-with st.sidebar:
-    st.header("📲 Szybki QR")
-    qr_s = qrcode.QRCode(version=1, box_size=8, border=2)
-    qr_s.add_data(RENDER_APP_URL)
-    qr_s.make(fit=True)
-    img_s = qr_s.make_image(fill_color="black", back_color="white")
-    buf_s = BytesIO()
-    img_s.save(buf_s)
-    st.image(buf_s.getvalue(), width=180)
