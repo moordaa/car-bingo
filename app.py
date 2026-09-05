@@ -4,13 +4,9 @@ import random
 import base64
 import qrcode
 from io import BytesIO
-from streamlit_autorefresh import st_autorefresh
 
 # Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
-
-# Zwiększenie interwału do 3 sekund (odciąża serwer i likwiduje opóźnienia)
-st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
 # Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
@@ -31,7 +27,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # Stały adres aplikacji na Render.com
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Wspólna, globalna pamięć gry (przechowuje planszę, żeby nie znikała przy odświeżeniu)
+# Wspólna, globalna pamięć gry
 @st.cache_resource
 def get_game_state():
     return {
@@ -60,7 +56,7 @@ if "my_session_id" not in st.session_state:
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Generowanie lub pobieranie globalnej planszy i kodowanie zdjęć TYLKO raz na zmianę gry (ogromne przyspieszenie)
+# Generowanie planszy i kodowanie zdjęć w pamięci podręcznej
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
@@ -233,12 +229,6 @@ else:
             const gridSize = {grid_size};
             const playerName = "{player_name}";
             const gameId = {game_state['game_id']};
-
-            if (localStorage.getItem('last_game_id') != gameId) {{
-                hasWon = false;
-                localStorage.setItem('last_game_id', gameId);
-                localStorage.removeItem('bingo_checked');
-            }}
 
             window.onload = function() {{
                 const buttons = window.parent.document.querySelectorAll('button');
