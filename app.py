@@ -4,9 +4,13 @@ import random
 import base64
 import qrcode
 from io import BytesIO
+from streamlit_autorefresh import st_autorefresh
 
 # Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
+
+# Lekkie, szybkie odświeżanie wyłącznie na wypadek zakończenia gry lub resetu (co 1.5 sekundy)
+st_autorefresh(interval=1500, limit=None, key="auto_refresh")
 
 # Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
@@ -56,7 +60,7 @@ if "my_session_id" not in st.session_state:
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Generowanie planszy i kodowanie zdjęć w pamięci podręcznej
+# Generowanie planszy i kodowanie zdjęć w pamięci podręcznej (tylko przy zmianie gry)
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
@@ -135,11 +139,22 @@ st.write("")
 
 # --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
 if game_state["ended"]:
+    # Jeśli gra się skończyła, odtwórz dźwięk zwycięstwa na każdym telefonie, który właśnie to wykrył
     st.markdown(f"""
         <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px;">
             <h1 style="margin:0; font-size: 2.5rem;">🎉 BINGO! 🎉</h1>
             <h3 style="margin:10px 0 0 0;">Zwycięża: <strong>{game_state['winner']}</strong></h3>
         </div>
+        
+        <script>
+            // Automatyczne powiadomienie głosowe u wszystkich graczy po wykryciu końca gry
+            if (!window.hasPlayedWinSpeech && 'speechSynthesis' in window) {{
+                window.hasPlayedWinSpeech = true;
+                const msg = new SpeechSynthesisUtterance('Bingo! Zwyciężył gracz {game_state["winner"]}!');
+                msg.lang = 'pl-PL';
+                window.speechSynthesis.speak(msg);
+            }}
+        </script>
     """, unsafe_allow_html=True)
     
     if is_current_master:
@@ -200,25 +215,7 @@ else:
                 font-size: {2.2 if grid_size == 5 else (2.8 if grid_size == 4 else 3.5)}rem;
                 pointer-events: none;
             }}
-            #win-banner {{
-                display: none;
-                background-color: #28a745;
-                color: white;
-                text-align: center;
-                font-size: 1.8rem;
-                font-weight: bold;
-                padding: 14px;
-                border-radius: 10px;
-                margin-bottom: 14px;
-                animation: pop 0.4s ease-in-out;
-            }}
-            @keyframes pop {{
-                0% {{ transform: scale(0.8); opacity: 0; }}
-                100% {{ transform: scale(1); opacity: 1; }}
-            }}
         </style>
-
-        <div id="win-banner">🎉 BINGO! WYGRANA! 🎉</div>
 
         <div class="bingo-container">
             {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
@@ -228,7 +225,6 @@ else:
             let hasWon = false;
             const gridSize = {grid_size};
             const playerName = "{player_name}";
-            const gameId = {game_state['game_id']};
 
             window.onload = function() {{
                 const buttons = window.parent.document.querySelectorAll('button');
@@ -273,7 +269,7 @@ else:
                 }});
             }}
 
-            function playVictorySound(name) {{
+            function playVictorySound() {{
                 try {{
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     const ctx = new AudioContext();
@@ -290,13 +286,6 @@ else:
                         osc.start(ctx.currentTime + index * 0.12);
                         osc.stop(ctx.currentTime + index * 0.12 + 0.3);
                     }});
-                    setTimeout(() => {{
-                        if ('speechSynthesis' in window) {{
-                            const msg = new SpeechSynthesisUtterance('Bingo! Zwyciężył gracz ' + name + '!');
-                            msg.lang = 'pl-PL';
-                            window.speechSynthesis.speak(msg);
-                        }}
-                    }}, 600);
                 }} catch(e) {{}}
             }}
 
@@ -312,11 +301,9 @@ else:
                     }}
                 }}
 
-                const banner = document.getElementById('win-banner');
                 if (isWin && !hasWon) {{
                     hasWon = true;
-                    banner.style.display = 'block';
-                    playVictorySound(playerName);
+                    playVictorySound();
                     triggerWinEvent();
                 }}
             }}
