@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Auto Bingo", layout="wide")
 
-# Odświeżanie strony w tle co 3 sekundy (aby pobrać reset Lidera i wygraną)
+# Odświeżanie strony w tle co 3 sekundy (synchronizacja resetu Lidera)
 st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
 # Ukrycie menu, stopki Streamlita i marginesów
@@ -82,7 +82,7 @@ else:
     else:
         current_game_id = game_state["game_id"]
         
-        # Jeśli lider zresetował grę (zmieniło się ID) -> losuj nową planszę
+        # Jeśli lider zresetował grę -> losuj nową planszę
         if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
             st.session_state["current_game_id"] = current_game_id
             st.session_state["bingo_grid"] = random.sample(all_images, required_images)
@@ -95,10 +95,10 @@ else:
                 encoded = base64.b64encode(f.read()).decode()
                 encoded_images.append(f"data:image/jpeg;base64,{encoded}")
 
-        # Zapobieganie ucinaniu dolnego rzędu
+        # Wysokość dopasowana do siatki
         html_height = 800 if grid_size == 3 else (1000 if grid_size == 4 else 1200)
 
-        # KOD HTML/JS - Obsługa kliknięć, sprawdzania BINGO i automatycznego wysyłania wygranej
+        # KOD HTML/JS - Przekazanie imienia gracza do skryptu wygranej
         html_code = f"""
         <style>
             .bingo-container {{
@@ -145,11 +145,11 @@ else:
                 background-color: #28a745;
                 color: white;
                 text-align: center;
-                font-size: 1.6rem;
+                font-size: 1.8rem;
                 font-weight: bold;
-                padding: 12px;
+                padding: 14px;
                 border-radius: 10px;
-                margin-bottom: 12px;
+                margin-bottom: 14px;
                 animation: pop 0.4s ease-in-out;
             }}
             @keyframes pop {{
@@ -158,7 +158,7 @@ else:
             }}
         </style>
 
-        <div id="win-banner">🎉 BINGO! 🎉</div>
+        <div id="win-banner">🎉 BINGO! WYGRANA! 🎉</div>
 
         <div class="bingo-container">
             {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
@@ -167,13 +167,14 @@ else:
         <script>
             let hasWon = false;
             const gridSize = {grid_size};
+            const playerName = "{player_name}";
 
-            // Ukrywa specjalny przycisk komunikacyjny po stronie Pythona
             window.onload = function() {{
                 const buttons = window.parent.document.querySelectorAll('button');
                 buttons.forEach(btn => {{
                     if (btn.innerText.includes('SYSTEM_WIN_BRIDGE')) {{
-                        btn.closest('div[data-testid="stButton"]').style.display = 'none';
+                        const container = btn.closest('div[data-testid="stButton"]');
+                        if (container) container.style.display = 'none';
                     }}
                 }});
             }};
@@ -206,12 +207,12 @@ else:
                 const buttons = window.parent.document.querySelectorAll('button');
                 buttons.forEach(btn => {{
                     if (btn.innerText.includes('SYSTEM_WIN_BRIDGE')) {{
-                        btn.click(); // Automatyczne wciśnięcie przycisku, python dostaje sygnał
+                        btn.click();
                     }}
                 }});
             }}
 
-            function playVictorySound() {{
+            function playVictorySound(name) {{
                 try {{
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     const ctx = new AudioContext();
@@ -230,7 +231,7 @@ else:
                     }});
                     setTimeout(() => {{
                         if ('speechSynthesis' in window) {{
-                            const msg = new SpeechSynthesisUtterance('Bingo! Zwycięstwo!');
+                            const msg = new SpeechSynthesisUtterance('Bingo! Zwyciężył gracz ' + name + '!');
                             msg.lang = 'pl-PL';
                             window.speechSynthesis.speak(msg);
                         }}
@@ -254,25 +255,21 @@ else:
                 if (isWin && !hasWon) {{
                     hasWon = true;
                     banner.style.display = 'block';
-                    playVictorySound();
-                    
-                    // Automatyczne powiadomienie serwera
+                    playVictorySound(playerName);
                     triggerWinEvent();
                 }}
             }}
 
             function toggleCard(card) {{
-                if(!hasWon) {{
-                    card.classList.toggle('checked');
-                    checkBingo();
-                }}
+                card.classList.toggle('checked');
+                checkBingo();
             }}
         </script>
         """
 
         st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        # Niewidzialny przycisk-łącznik. Kiedy JS automatycznie go "kliknie", gra się kończy.
+        # Niewidzialny przycisk łączący przeglądarkę z serwerem
         if st.button("SYSTEM_WIN_BRIDGE", key="win_bridge"):
             game_state["ended"] = True
             game_state["winner"] = player_name
