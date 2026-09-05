@@ -43,7 +43,7 @@ else:
             encoded = base64.b64encode(f.read()).decode()
             encoded_images.append(f"data:image/jpeg;base64,{encoded}")
 
-    # Kod HTML i CSS tworzący wymuszoną siatkę 3x3 oraz klikalne obrazki
+    # Kod HTML, CSS i JavaScript z generowaniem dźwięku fanfar i głosu
     html_code = f"""
     <style>
         .bingo-container {{
@@ -57,12 +57,14 @@ else:
         .bingo-card {{
             position: relative;
             width: 100%;
-            padding-top: 100%; /* Kwadratowy kształt */
+            padding-top: 100%;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             cursor: pointer;
             user-select: none;
+            border: 3px solid transparent;
+            transition: border-color 0.3s;
         }}
         .bingo-card img {{
             position: absolute;
@@ -71,11 +73,10 @@ else:
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.2s, filter 0.2s;
+            transition: filter 0.2s;
         }}
-        /* Efekt po kliknięciu/zaznaczeniu */
         .bingo-card.checked img {{
-            filter: grayscale(80%) brightness(50%);
+            filter: grayscale(80%) brightness(40%);
         }}
         .bingo-card.checked::after {{
             content: "❌";
@@ -86,14 +87,106 @@ else:
             font-size: 3.5rem;
             pointer-events: none;
         }}
+        #win-banner {{
+            display: none;
+            background-color: #28a745;
+            color: white;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            animation: pop 0.4s ease-in-out;
+        }}
+        @keyframes pop {{
+            0% {{ transform: scale(0.8); opacity: 0; }}
+            100% {{ transform: scale(1); opacity: 1; }}
+        }}
     </style>
 
+    <div id="win-banner">🎉 BINGO! WYGRANA! 🎉</div>
+
     <div class="bingo-container">
-        {"".join([f'<div class="bingo-card" onclick="this.classList.toggle(\'checked\')"><img src="{img_url}"></div>' for img_url in encoded_images])}
+        {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
     </div>
+
+    <script>
+        let hasWon = false;
+
+        // Generator tonów dźwiękowych (fanfara wygranej)
+        function playVictorySound() {{
+            try {{
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+                
+                const notes = [261.63, 329.63, 392.00, 523.25]; // Do-Mi-Sol-Do
+                notes.forEach((freq, index) => {{
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime + index * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + index * 0.12 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + index * 0.12);
+                    osc.stop(ctx.currentTime + index * 0.12 + 0.3);
+                }});
+
+                // Lektor głosowy po odtworzeniu dźwięków
+                setTimeout(() => {{
+                    if ('speechSynthesis' in window) {{
+                        const msg = new SpeechSynthesisUtterance('Bingo! Mamy zwycięzcę!');
+                        msg.lang = 'pl-PL';
+                        msg.rate = 1.0;
+                        window.speechSynthesis.speak(msg);
+                    }}
+                }}, 600);
+            }} catch(e) {{
+                console.log("Dźwięk wyłączony lub zablokowany przez przeglądarkę.");
+            }}
+        }}
+
+        function checkBingo() {{
+            const cards = document.querySelectorAll('.bingo-card');
+            const checked = Array.from(cards).map(card => card.classList.contains('checked'));
+
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Poziome
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Pionowe
+                [0, 4, 8], [2, 4, 6]             // Przekątne
+            ];
+
+            let isWin = false;
+            for (let pattern of winPatterns) {{
+                if (pattern.every(index => checked[index])) {{
+                    isWin = true;
+                    break;
+                }}
+            }}
+
+            const banner = document.getElementById('win-banner');
+            if (isWin) {{
+                banner.style.display = 'block';
+                if (!hasWon) {{
+                    hasWon = true;
+                    playVictorySound();
+                }}
+            }} else {{
+                banner.style.display = 'none';
+                hasWon = false;
+            }}
+        }}
+
+        function toggleCard(card) {{
+            card.classList.toggle('checked');
+            checkBingo();
+        }}
+    </script>
     """
 
-    st.components.v1.html(html_code, height=520, scrolling=False)
+    st.components.v1.html(html_code, height=600, scrolling=False)
 
 # Boczne menu z kodem QR do dołączania pasażerów
 with st.sidebar:
