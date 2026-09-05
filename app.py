@@ -9,8 +9,8 @@ from streamlit_autorefresh import st_autorefresh
 # Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
 
-# Agresywne odświeżanie co 1 sekundę dla natychmiastowej synchronizacji
-st_autorefresh(interval=1000, limit=None, key="auto_refresh")
+# Zwiększenie interwału do 3 sekund (odciąża serwer i likwiduje opóźnienia)
+st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
 # Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
@@ -31,7 +31,7 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # Stały adres aplikacji na Render.com
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Wspólna, globalna pamięć gry
+# Wspólna, globalna pamięć gry (przechowuje planszę, żeby nie znikała przy odświeżeniu)
 @st.cache_resource
 def get_game_state():
     return {
@@ -39,7 +39,10 @@ def get_game_state():
         "winner": None,
         "ended": False,
         "game_id": 1,
-        "master_session": None
+        "master_session": None,
+        "bingo_grid": [],
+        "encoded_images": [],
+        "last_game_id": 0
     }
 
 game_state = get_game_state()
@@ -56,6 +59,23 @@ if "my_session_id" not in st.session_state:
 
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
+
+# Generowanie lub pobieranie globalnej planszy i kodowanie zdjęć TYLKO raz na zmianę gry (ogromne przyspieszenie)
+grid_size = game_state["grid_size"]
+required_images = grid_size * grid_size
+
+if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encoded_images"]) != required_images:
+    if len(all_images) >= required_images:
+        selected_imgs = random.sample(all_images, required_images)
+        encoded_list = []
+        for img_name in selected_imgs:
+            img_path = os.path.join(IMAGE_DIR, img_name)
+            with open(img_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode()
+                encoded_list.append(f"data:image/jpeg;base64,{encoded}")
+        game_state["bingo_grid"] = selected_imgs
+        game_state["encoded_images"] = encoded_list
+        game_state["last_game_id"] = game_state["game_id"]
 
 # Tytuł
 st.markdown("<h2 style='text-align: center; margin-top: 0; padding-top: 0;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
@@ -117,9 +137,6 @@ player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["playe
 st.session_state["player_name"] = player_name
 st.write("") 
 
-grid_size = game_state["grid_size"]
-required_images = grid_size * grid_size
-
 # --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
 if game_state["ended"]:
     st.markdown(f"""
@@ -143,20 +160,8 @@ else:
     if len(all_images) < required_images:
         st.warning(f"Za mało zdjęć! Masz {len(all_images)}, a potrzebujesz min. {required_images}!")
     else:
-        current_game_id = game_state["game_id"]
-        
-        if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
-            st.session_state["current_game_id"] = current_game_id
-            st.session_state["bingo_grid"] = random.sample(all_images, required_images)
-
-        encoded_images = []
-        for img_name in st.session_state["bingo_grid"]:
-            img_path = os.path.join(IMAGE_DIR, img_name)
-            with open(img_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode()
-                encoded_images.append(f"data:image/jpeg;base64,{encoded}")
-
         html_height = 800 if grid_size == 3 else (1000 if grid_size == 4 else 1200)
+        encoded_images = game_state["encoded_images"]
 
         html_code = f"""
         <style>
@@ -227,12 +232,12 @@ else:
             let hasWon = false;
             const gridSize = {grid_size};
             const playerName = "{player_name}";
-            const gameId = {current_game_id};
+            const gameId = {game_state['game_id']};
 
-            // Reset stanu wygranej w przypadku nowej gry (zapobiega wyblaknięciu planszy)
             if (localStorage.getItem('last_game_id') != gameId) {{
                 hasWon = false;
                 localStorage.setItem('last_game_id', gameId);
+                localStorage.removeItem('bingo_checked');
             }}
 
             window.onload = function() {{
@@ -243,7 +248,7 @@ else:
                         if (container) container.style.display = 'none';
                     }}
                 }});
-            }};
+            }}
 
             function generateWinPatterns(size) {{
                 const patterns = [];
