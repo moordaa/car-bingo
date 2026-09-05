@@ -5,17 +5,15 @@ import base64
 import qrcode
 from io import BytesIO
 
-# Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
 
-# Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 1rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
@@ -24,10 +22,8 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Stały adres aplikacji na Render.com
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Wspólna, globalna pamięć gry
 @st.cache_resource
 def get_game_state():
     return {
@@ -49,14 +45,12 @@ if os.path.exists(IMAGE_DIR):
 else:
     all_images = []
 
-# Unikalne ID dla każdego telefonu
 if "my_session_id" not in st.session_state:
     st.session_state["my_session_id"] = str(random.randint(100000, 999999))
 
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Błyskawiczne generowanie i keszowanie planszy
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
@@ -73,34 +67,31 @@ if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encode
         game_state["encoded_images"] = encoded_list
         game_state["last_game_id"] = game_state["game_id"]
 
-# Tytuł
-st.markdown("<h2 style='text-align: center; margin-top: 0; padding-top: 0;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
 is_current_master = (game_state["master_session"] == st.session_state["my_session_id"])
 
-# --- 1. KOD QR ---
-with st.expander("📲 Pokaż kod QR do gry", expanded=False):
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    qr = qrcode.QRCode(version=1, box_size=6, border=1)
-    qr.add_data(RENDER_APP_URL)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf)
-    st.image(buf.getvalue(), width=160)
-    st.markdown("</div>", unsafe_allow_html=True)
+col_ctrl1, col_ctrl2 = st.columns([1, 1])
+with col_ctrl1:
+    if game_state["master_session"] is None:
+        if st.button("👑 Zostań Liderem", use_container_width=True, type="primary"):
+            game_state["master_session"] = st.session_state["my_session_id"]
+            st.rerun()
+    elif is_current_master:
+        if st.button("❌ Oddaj Lidera", use_container_width=True):
+            game_state["master_session"] = None
+            st.rerun()
+    else:
+        if st.button("👑 Przejmij Lidera", use_container_width=True):
+            game_state["master_session"] = st.session_state["my_session_id"]
+            st.rerun()
 
-# --- 2. PANEL LIDERA ---
-if game_state["master_session"] is None:
-    if st.button("👑 Zostań Liderem gry", use_container_width=True, type="primary"):
-        game_state["master_session"] = st.session_state["my_session_id"]
+with col_ctrl2:
+    if st.button("🔄 Odśwież planszę", use_container_width=True):
         st.rerun()
-elif is_current_master:
-    st.markdown("""
-        <div style="background-color: #e6f7ff; padding: 15px; border-radius: 10px; border: 1px solid #91d5ff; margin-bottom: 15px;">
-            <h4 style="margin-top: 0; color: #0050b3; text-align: center;">👑 Jesteś Liderem</h4>
-    """, unsafe_allow_html=True)
-    
+
+if is_current_master:
+    st.markdown("<div style='background: #f0f2f6; padding: 10px; border-radius: 8px; margin: 8px 0;'>", unsafe_allow_html=True)
     idx = 0
     if game_state["grid_size"] == 4: idx = 1
     elif game_state["grid_size"] == 5: idx = 2
@@ -108,42 +99,34 @@ elif is_current_master:
     grid_choice = st.selectbox("Rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], index=idx)
     new_size = int(grid_choice.split("x")[0])
     
-    col_reset, col_giveup = st.columns(2)
-    with col_reset:
-        if st.button("🚀 Rozdaj od nowa", use_container_width=True, type="primary"):
-            game_state["grid_size"] = new_size
-            game_state["winner"] = None
-            game_state["ended"] = False
-            game_state["game_id"] += 1
-            st.rerun()
-    with col_giveup:
-        if st.button("❌ Oddaj Lidera", use_container_width=True):
-            game_state["master_session"] = None
-            st.rerun()
-            
-    st.markdown("</div>", unsafe_allow_html=True)
-else:
-    st.info("⚠️ Inny gracz dowodzi teraz grą.")
-    if st.button("Przejmij Lidera", use_container_width=True):
-        game_state["master_session"] = st.session_state["my_session_id"]
+    if st.button("🚀 Rozdaj nową grę wszystkim", use_container_width=True, type="primary"):
+        game_state["grid_size"] = new_size
+        game_state["winner"] = None
+        game_state["ended"] = False
+        game_state["game_id"] += 1
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# --- 3. POLE NA IMIĘ ---
 player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
 st.session_state["player_name"] = player_name
-st.write("") 
 
-# Przycisk ręcznego odświeżenia stanu (gdy gracz chce sprawdzić, czy ktoś wygrał lub zmieniła się plansza)
-col_sync1, col_sync2 = st.columns([3, 1])
-with col_sync2:
-    if st.button("🔄 Odśwież", use_container_width=True):
-        st.rerun()
+with st.expander("📲 Pokaż kod QR", expanded=False):
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    qr = qrcode.QRCode(version=1, box_size=5, border=1)
+    qr.add_data(RENDER_APP_URL)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf)
+    st.image(buf.getvalue(), width=140)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
+st.write("")
+
 if game_state["ended"]:
     st.markdown(f"""
-        <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px;">
-            <h1 style="margin:0; font-size: 2.5rem;">🎉 BINGO! 🎉</h1>
+        <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 10px;">
+            <h1 style="margin:0; font-size: 2.2rem;">🎉 BINGO! 🎉</h1>
             <h3 style="margin:10px 0 0 0;">Zwycięża: <strong>{game_state['winner']}</strong></h3>
         </div>
         
@@ -159,19 +142,18 @@ if game_state["ended"]:
     
     if is_current_master:
         st.write("")
-        if st.button("🚀 Grajcie dalej (Nowe rozdanie)", use_container_width=True, type="primary"):
+        if st.button("🚀 Rozpocznij kolejną rundę", use_container_width=True, type="primary"):
             game_state["winner"] = None
             game_state["ended"] = False
             game_state["game_id"] += 1
             st.rerun()
     else:
         st.info("Czekamy na Lidera, aż rozpocznie nową rundę...")
-        
 else:
     if len(all_images) < required_images:
-        st.warning(f"Za mało zdjęć! Masz {len(all_images)}, a potrzebujesz min. {required_images}!")
+        st.warning(f"Za mało zdjęć! Masz {len(all_images)}, potrzebujesz min. {required_images}!")
     else:
-        html_height = 800 if grid_size == 3 else (1000 if grid_size == 4 else 1200)
+        html_height = 750 if grid_size == 3 else (950 if grid_size == 4 else 1150)
         encoded_images = game_state["encoded_images"]
 
         html_code = f"""
@@ -179,18 +161,18 @@ else:
             .bingo-container {{
                 display: grid;
                 grid-template-columns: repeat({grid_size}, 1fr);
-                gap: 6px;
+                gap: 5px;
                 width: 100%;
-                max-width: 600px;
+                max-width: 500px;
                 margin: auto;
             }}
             .bingo-card {{
                 position: relative;
                 width: 100%;
                 padding-top: 100%;
-                border-radius: {8 if grid_size > 3 else 12}px;
+                border-radius: 8px;
                 overflow: hidden;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 cursor: pointer;
                 user-select: none;
             }}
@@ -212,7 +194,7 @@ else:
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                font-size: {2.2 if grid_size == 5 else (2.8 if grid_size == 4 else 3.5)}rem;
+                font-size: 2.5rem;
                 pointer-events: none;
             }}
         </style>
