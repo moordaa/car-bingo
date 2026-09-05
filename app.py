@@ -24,6 +24,9 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 st.title("🚗 Auto Bingo")
 
+# Stały, poprawny adres Twojej aplikacji na Render.com
+RENDER_APP_URL = "https://car-bingo.onrender.com"
+
 # Wspólna pamięć dla wszystkich telefonów w aucie
 @st.cache_resource
 def get_game_state():
@@ -55,20 +58,20 @@ with col2:
 
 st.write("---")
 
-# --- KOD QR NA GŁÓWNYM EKRANIE ---
+# --- KOD QR NA GŁÓWNYM EKRANIE (NA SZTYWNO) ---
 with st.expander("📲 Pokaż kod QR do wspólnej gry dla pasażerów", expanded=False):
     st.write("Zeskanuj ten kod telefonem pasażera:")
-    # Tutaj wklej swój nowy adres z Render.com (zastąp poniższy link swoim)
-    app_url = st.text_input("Link do gry:", "https://car-bingo.onrender.com", key="main_qr_url")
     
+    # Generowanie kodu QR bezpośrednio ze stałego adresu Render.com
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
-    qr.add_data(app_url)
+    qr.add_data(RENDER_APP_URL)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     
     buf = BytesIO()
     img.save(buf)
     st.image(buf.getvalue(), width=200)
+    st.caption(f"Link docelowy: {RENDER_APP_URL}")
 
 # --- PANEL LIDERA (RESET GRY) ---
 if is_master:
@@ -293,11 +296,11 @@ else:
 # --- BOCZNE MENU ---
 with st.sidebar:
     st.header("📲 Szybki QR")
-    app_url_sidebar = st.text_input("Link:", "https://car-bingo.onrender.com", key="sidebar_url")
     qr_s = qrcode.QRCode(version=1, box_size=8, border=2)
-    qr_s.add_data(app_url_sidebar)
+    qr_s.add_data(RENDER_APP_URL)
     qr_s.make(fit=True)
     img_s = qr_s.make_image(fill_color="black", back_color="white")
     buf_s = BytesIO()
     img_s.save(buf_s)
     st.image(buf_s.getvalue(), width=180)
+    st.caption(RENDER_APP_URL)
