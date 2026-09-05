@@ -11,13 +11,28 @@ st.set_page_config(page_title="Auto Bingo", layout="wide")
 # Odświeżanie strony w tle co 3 sekundy (synchronizacja)
 st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
-# Ukrycie menu, stopki Streamlita i marginesów
+# Ukrycie menu, stopki Streamlita, marginesów oraz wymuszenie kwadratowego kształtu przycisków w rzędzie
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {padding: 0.5rem;}
+    
+    /* Styl dla kwadratowych przycisków w jednej linii */
+    div[data-testid="stHorizontalBlock"] > div:not([data-testid="column"]) {
+        display: flex;
+        gap: 6px;
+    }
+    div[data-testid="stHorizontalBlock"] button {
+        aspect-ratio: 1 / 1;
+        width: 100%;
+        min-height: 55px;
+        padding: 0px;
+        font-size: 0.9rem;
+        line-height: 1.2;
+        border-radius: 8px;
+    }
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -33,7 +48,7 @@ def get_game_state():
         "winner": None,
         "ended": False,
         "game_id": 1,
-        "master_session": None  # Śledzi unikalnego Lidera
+        "master_session": None
     }
 
 game_state = get_game_state()
@@ -44,14 +59,12 @@ if os.path.exists(IMAGE_DIR):
 else:
     all_images = []
 
-# Identyfikacja sesji gracza
 if "my_session_id" not in st.session_state:
     st.session_state["my_session_id"] = str(random.randint(100000, 999999))
 
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Inicjalizacja stanów zakładek
 for key in ["show_qr", "show_master", "show_settings", "show_reset"]:
     if key not in st.session_state:
         st.session_state[key] = False
@@ -59,17 +72,15 @@ for key in ["show_qr", "show_master", "show_settings", "show_reset"]:
 # Tytuł aplikacji
 st.title("🚗 Auto Bingo")
 
-# Pole na imię gracza
 player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
 st.session_state["player_name"] = player_name
 
-# --- PASEK STEROWANIA: KWADRATOWE PRZYCISKI W JEDNEJ LINII ---
+# --- PASEK STEROWANIA: 4 KWADRATOWE PRZYCISKI W JEDNEJ LINII ---
 col_b1, col_b2, col_b3, col_b4, col_space = st.columns([1, 1, 1, 1, 4])
 
 with col_b1:
     if st.button("📱\nQR", use_container_width=True):
         st.session_state["show_qr"] = not st.session_state["show_qr"]
-        st.session_state["show_master"] = False
         st.session_state["show_settings"] = False
         st.session_state["show_reset"] = False
         st.rerun()
@@ -88,7 +99,6 @@ with col_b3:
     if st.button("⚙️\nPlansza", use_container_width=True):
         st.session_state["show_settings"] = not st.session_state["show_settings"]
         st.session_state["show_qr"] = False
-        st.session_state["show_master"] = False
         st.session_state["show_reset"] = False
         st.rerun()
 
@@ -96,16 +106,13 @@ with col_b4:
     if st.button("🚀\nReset", use_container_width=True):
         st.session_state["show_reset"] = not st.session_state["show_reset"]
         st.session_state["show_qr"] = False
-        st.session_state["show_master"] = False
         st.session_state["show_settings"] = False
         st.rerun()
 
-# Sprawdzenie czy aktualny użytkownik jest liderem
 is_master = is_current_master
 
-# --- ROZWIJANE PANELE POD PRZYCISKAMI ---
+# --- ROZWIJANE PANELE ---
 
-# 1. Panel QR
 if st.session_state["show_qr"]:
     st.markdown("""
         <div style="background-color: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center; margin-top: 10px; border: 1px solid #ddd;">
@@ -123,7 +130,6 @@ if st.session_state["show_qr"]:
         st.image(buf.getvalue(), width=200)
         st.caption(f"Link: {RENDER_APP_URL}")
 
-# 2. Panel wyboru wielkości planszy (dostępny dla Lidera)
 if st.session_state["show_settings"]:
     st.markdown("### ⚙️ Wybór wielkości planszy")
     if is_master:
@@ -136,7 +142,6 @@ if st.session_state["show_settings"]:
     else:
         st.warning("⚠️ Tylko aktualny Lider (Master) może zmieniać wielkość planszy!")
 
-# 3. Panel resetu gry (dostępny dla Lidera)
 if st.session_state["show_reset"]:
     st.markdown("### 🚀 Resetowanie gry")
     if is_master:
