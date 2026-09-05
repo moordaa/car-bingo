@@ -345,16 +345,16 @@ else:
         if st.session_state["my_session_id"] not in game_state["player_states"]:
             game_state["player_states"][st.session_state["my_session_id"]] = {"name": player_name, "checked": [False]*required_images}
 
-        # --- PEŁNY PODGLĄD PLANSZ PRECIWNIKÓW ---
+        # --- PEŁNY PODGLĄD PLANSZ PRECIWNIKÓW Z PRZYCISKIEM ODŚWIEŻANIA ---
         other_players = {sid: pdata for sid, pdata in game_state["player_states"].items() if sid != st.session_state["my_session_id"]}
         
         if other_players:
             st.markdown("---")
             st.markdown("### 👥 Plansze innych graczy:")
+            
             for sid, pdata in other_players.items():
                 st.markdown(f"**Gracz: {pdata['name']}**")
                 
-                # Generowanie miniatury pełnej planszy przeciwnika w HTML
                 opp_cards_html = ""
                 for idx, img_url in enumerate(encoded_images):
                     is_checked = pdata["checked"][idx] if idx < len(pdata["checked"]) else False
