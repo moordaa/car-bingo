@@ -4,12 +4,8 @@ import random
 import base64
 import qrcode
 from io import BytesIO
-from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Auto Bingo", layout="wide")
-
-# Bezinwazyjne odświeżanie w tle co 2.5 sekundy (pozwala innym graczom zobaczyć wygraną)
-st_autorefresh(interval=2500, limit=None, key="auto_refresh")
 
 # Ukrycie paska nagłówka i stopki Streamlita
 hide_streamlit_style = """
@@ -83,7 +79,7 @@ else:
     else:
         current_game_id = game_state["game_id"]
         
-        # Generowanie nowej planszy tylko, gdy Lider wymusił zmianę id gry
+        # Generowanie nowej planszy tylko przy zmianie ID gry przez Lidera
         if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
             st.session_state["current_game_id"] = current_game_id
             st.session_state["bingo_grid"] = random.sample(all_images, required_images)
@@ -258,7 +254,7 @@ else:
 
         st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        # Nowy, fizyczny przycisk do zakomunikowania serwerowi o wygranej (działa 100% niezawodnie)
+        # Przycisk zgłoszenia Bingo
         if st.button("🏆 ZGŁOŚ BINGO!", type="primary", use_container_width=True):
             game_state["ended"] = True
             game_state["winner"] = player_name
