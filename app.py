@@ -20,7 +20,7 @@ hide_streamlit_style = """
     
     /* Całkowite usunięcie górnego marginesu strony */
     .block-container {
-        padding-top: 0.5rem !important;
+        padding-top: 0.4rem !important;
         padding-bottom: 0.5rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -38,11 +38,11 @@ hide_streamlit_style = """
     div[data-testid="stHorizontalBlock"] button {
         aspect-ratio: 1 / 1;
         width: 100%;
-        min-height: 60px;
+        min-height: 55px;
         padding: 0px;
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-weight: bold;
-        line-height: 1.2;
+        line-height: 1.1;
         border-radius: 10px;
     }
     </style>
