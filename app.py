@@ -74,7 +74,7 @@ if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encode
 
 st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
-# --- PANEL STEROWANIA (BEZ LIDERA) ---
+# --- PANEL STEROWANIA (KAŻDY MA IDENTYCZNE UPRAWNIENIA) ---
 col_ctrl1, col_ctrl2 = st.columns([1, 1])
 
 with col_ctrl1:
@@ -95,13 +95,13 @@ with col_ctrl2:
             st.session_state["confirm_restart"] = False
             st.rerun()
 
-# Wybór wielkości planszy dostępny dla każdego
+# Wybór wielkości planszy dostępny dla każdego na równych prawach
 st.markdown("<div style='background: #f0f2f6; padding: 10px; border-radius: 8px; margin: 8px 0;'>", unsafe_allow_html=True)
 idx = 0
 if game_state["grid_size"] == 4: idx = 1
 elif game_state["grid_size"] == 5: idx = 2
 
-grid_choice = st.selectbox("Rozmiar planszy dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], index=idx)
+grid_choice = st.selectbox("Rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], index=idx)
 new_size = int(grid_choice.split("x")[0])
 
 if new_size != game_state["grid_size"]:
