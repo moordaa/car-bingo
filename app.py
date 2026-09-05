@@ -4,13 +4,9 @@ import random
 import base64
 import qrcode
 from io import BytesIO
-from streamlit_autorefresh import st_autorefresh
 
 # Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
-
-# Lekkie odświeżanie wyłącznie dla natychmiastowej synchronizacji zdarzeń (co 1 sekunda)
-st_autorefresh(interval=1000, limit=None, key="auto_refresh")
 
 # Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
@@ -60,7 +56,7 @@ if "my_session_id" not in st.session_state:
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Błyskawiczne keszowanie planszy w pamięci – zdjęcia generują się RAZ na rundę
+# Błyskawiczne generowanie i keszowanie planszy
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
@@ -137,6 +133,12 @@ player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["playe
 st.session_state["player_name"] = player_name
 st.write("") 
 
+# Przycisk ręcznego odświeżenia stanu (gdy gracz chce sprawdzić, czy ktoś wygrał lub zmieniła się plansza)
+col_sync1, col_sync2 = st.columns([3, 1])
+with col_sync2:
+    if st.button("🔄 Odśwież", use_container_width=True):
+        st.rerun()
+
 # --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
 if game_state["ended"]:
     st.markdown(f"""
@@ -146,7 +148,6 @@ if game_state["ended"]:
         </div>
         
         <script>
-            // Powiadomienie głosowe u każdego gracza w momencie wykrycia wygranej
             if (!window.hasPlayedWinSpeech && 'speechSynthesis' in window) {{
                 window.hasPlayedWinSpeech = true;
                 const msg = new SpeechSynthesisUtterance('Bingo! Zwyciężył gracz {game_state["winner"]}!');
