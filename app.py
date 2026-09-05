@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 # Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
 
-# Agresywne odświeżanie co 1 sekundę dla natychmiastowej reakcji
+# Agresywne odświeżanie co 1 sekundę dla natychmiastowej synchronizacji
 st_autorefresh(interval=1000, limit=None, key="auto_refresh")
 
 # Minimalistyczny styl, usunięcie górnych marginesów
@@ -62,7 +62,7 @@ st.markdown("<h2 style='text-align: center; margin-top: 0; padding-top: 0;'>🚗
 
 is_current_master = (game_state["master_session"] == st.session_state["my_session_id"])
 
-# --- 1. KOD QR (Schowany, żeby nie zajmował miejsca) ---
+# --- 1. KOD QR ---
 with st.expander("📲 Pokaż kod QR do gry", expanded=False):
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
     qr = qrcode.QRCode(version=1, box_size=6, border=1)
@@ -74,19 +74,17 @@ with st.expander("📲 Pokaż kod QR do gry", expanded=False):
     st.image(buf.getvalue(), width=160)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- 2. PANEL LIDERA (Zawsze widoczny na wierzchu) ---
+# --- 2. PANEL LIDERA ---
 if game_state["master_session"] is None:
     if st.button("👑 Zostań Liderem gry", use_container_width=True, type="primary"):
         game_state["master_session"] = st.session_state["my_session_id"]
         st.rerun()
 elif is_current_master:
-    # Jasnoniebieska ramka widoczna TYLKO dla Lidera
     st.markdown("""
         <div style="background-color: #e6f7ff; padding: 15px; border-radius: 10px; border: 1px solid #91d5ff; margin-bottom: 15px;">
             <h4 style="margin-top: 0; color: #0050b3; text-align: center;">👑 Jesteś Liderem</h4>
     """, unsafe_allow_html=True)
     
-    # Wybór rozmiaru planszy dostosowany do aktualnego stanu
     idx = 0
     if game_state["grid_size"] == 4: idx = 1
     elif game_state["grid_size"] == 5: idx = 2
@@ -109,7 +107,6 @@ elif is_current_master:
             
     st.markdown("</div>", unsafe_allow_html=True)
 else:
-    # Co widzą inni gracze
     st.info("⚠️ Inny gracz dowodzi teraz grą.")
     if st.button("Przejmij Lidera", use_container_width=True):
         game_state["master_session"] = st.session_state["my_session_id"]
@@ -125,7 +122,6 @@ required_images = grid_size * grid_size
 
 # --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
 if game_state["ended"]:
-    # Natychmiastowe ukrycie planszy u wszystkich i pokazanie zwycięzcy
     st.markdown(f"""
         <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px;">
             <h1 style="margin:0; font-size: 2.5rem;">🎉 BINGO! 🎉</h1>
@@ -231,6 +227,13 @@ else:
             let hasWon = false;
             const gridSize = {grid_size};
             const playerName = "{player_name}";
+            const gameId = {current_game_id};
+
+            // Reset stanu wygranej w przypadku nowej gry (zapobiega wyblaknięciu planszy)
+            if (localStorage.getItem('last_game_id') != gameId) {{
+                hasWon = false;
+                localStorage.setItem('last_game_id', gameId);
+            }}
 
             window.onload = function() {{
                 const buttons = window.parent.document.querySelectorAll('button');
