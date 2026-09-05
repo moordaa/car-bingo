@@ -6,13 +6,13 @@ import qrcode
 from io import BytesIO
 from streamlit_autorefresh import st_autorefresh
 
-# Ustawienie "centered" wygląda o wiele schludniej na telefonach niż "wide"
+# Ustawienie "centered" dla schludnego wyglądu mobilnego
 st.set_page_config(page_title="Auto Bingo", layout="centered")
 
-# Odświeżanie strony w tle co 3 sekundy (synchronizacja)
-st_autorefresh(interval=3000, limit=None, key="auto_refresh")
+# Agresywne odświeżanie co 1 sekundę dla natychmiastowej reakcji
+st_autorefresh(interval=1000, limit=None, key="auto_refresh")
 
-# Ukrycie paska menu, stopki i maksymalne dosunięcie do góry bez psucia mobilnego interfejsu
+# Minimalistyczny styl, usunięcie górnych marginesów
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -28,10 +28,10 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Stały, poprawny adres aplikacji na Render.com
+# Stały adres aplikacji na Render.com
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Wspólna pamięć dla wszystkich w aucie
+# Wspólna, globalna pamięć gry
 @st.cache_resource
 def get_game_state():
     return {
@@ -50,20 +50,21 @@ if os.path.exists(IMAGE_DIR):
 else:
     all_images = []
 
+# Unikalne ID dla każdego telefonu
 if "my_session_id" not in st.session_state:
     st.session_state["my_session_id"] = str(random.randint(100000, 999999))
 
 if "player_name" not in st.session_state:
     st.session_state["player_name"] = "Pasażer 1"
 
-# Schludny, wycentrowany tytuł
+# Tytuł
 st.markdown("<h2 style='text-align: center; margin-top: 0; padding-top: 0;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
-# --- MINIMALISTYCZNE MENU ZWIJANE ---
-# Wszystkie opcje sterowania i QR są schowane w jednym elemencie
-with st.expander("⚙️ Menu Gry (QR, Lider, Reset)", expanded=False):
-    
-    st.markdown("**📱 Kod QR dla pasażerów:**")
+is_current_master = (game_state["master_session"] == st.session_state["my_session_id"])
+
+# --- 1. KOD QR (Schowany, żeby nie zajmował miejsca) ---
+with st.expander("📲 Pokaż kod QR do gry", expanded=False):
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
     qr = qrcode.QRCode(version=1, box_size=6, border=1)
     qr.add_data(RENDER_APP_URL)
     qr.make(fit=True)
@@ -71,51 +72,80 @@ with st.expander("⚙️ Menu Gry (QR, Lider, Reset)", expanded=False):
     buf = BytesIO()
     img.save(buf)
     st.image(buf.getvalue(), width=160)
-    
-    st.write("---")
-    
-    is_current_master = (game_state["master_session"] == st.session_state["my_session_id"])
-    master_toggle = st.checkbox("👑 Jestem Liderem", value=is_current_master)
-    
-    # Logika przejmowania statusu lidera
-    if master_toggle and not is_current_master:
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- 2. PANEL LIDERA (Zawsze widoczny na wierzchu) ---
+if game_state["master_session"] is None:
+    if st.button("👑 Zostań Liderem gry", use_container_width=True, type="primary"):
         game_state["master_session"] = st.session_state["my_session_id"]
         st.rerun()
-    elif not master_toggle and is_current_master:
-        game_state["master_session"] = None
-        st.rerun()
-        
-    # Opcje widoczne tylko dla Lidera
-    if is_current_master:
-        st.write("---")
-        grid_choice = st.selectbox("Rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
-        new_size = int(grid_choice.split("x")[0])
-        
-        if st.button("🚀 Zresetuj grę dla wszystkich", use_container_width=True, type="primary"):
+elif is_current_master:
+    # Jasnoniebieska ramka widoczna TYLKO dla Lidera
+    st.markdown("""
+        <div style="background-color: #e6f7ff; padding: 15px; border-radius: 10px; border: 1px solid #91d5ff; margin-bottom: 15px;">
+            <h4 style="margin-top: 0; color: #0050b3; text-align: center;">👑 Jesteś Liderem</h4>
+    """, unsafe_allow_html=True)
+    
+    # Wybór rozmiaru planszy dostosowany do aktualnego stanu
+    idx = 0
+    if game_state["grid_size"] == 4: idx = 1
+    elif game_state["grid_size"] == 5: idx = 2
+    
+    grid_choice = st.selectbox("Rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], index=idx)
+    new_size = int(grid_choice.split("x")[0])
+    
+    col_reset, col_giveup = st.columns(2)
+    with col_reset:
+        if st.button("🚀 Rozdaj od nowa", use_container_width=True, type="primary"):
             game_state["grid_size"] = new_size
             game_state["winner"] = None
             game_state["ended"] = False
             game_state["game_id"] += 1
             st.rerun()
+    with col_giveup:
+        if st.button("❌ Oddaj Lidera", use_container_width=True):
+            game_state["master_session"] = None
+            st.rerun()
+            
+    st.markdown("</div>", unsafe_allow_html=True)
+else:
+    # Co widzą inni gracze
+    st.info("⚠️ Inny gracz dowodzi teraz grą.")
+    if st.button("Przejmij Lidera", use_container_width=True):
+        game_state["master_session"] = st.session_state["my_session_id"]
+        st.rerun()
 
-# --- POLE NA IMIĘ TUŻ NAD PLANSZĄ ---
+# --- 3. POLE NA IMIĘ ---
 player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
 st.session_state["player_name"] = player_name
+st.write("") 
 
-st.write("") # Drobny odstęp przed planszą
-
-# --- LOGIKA GRY (BEZ ZMIAN) ---
-is_master = (game_state["master_session"] == st.session_state["my_session_id"])
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
+# --- 4. GŁÓWNY EKRAN GRY / WYNIKÓW ---
 if game_state["ended"]:
-    st.error(f"🛑 KONIEC GRY! Gracz **{game_state['winner']}** ułożył BINGO jako pierwszy!")
-    if is_master:
-        st.info("💡 Liderze, rozwiń Menu Gry u góry i zresetuj planszę.")
+    # Natychmiastowe ukrycie planszy u wszystkich i pokazanie zwycięzcy
+    st.markdown(f"""
+        <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 20px;">
+            <h1 style="margin:0; font-size: 2.5rem;">🎉 BINGO! 🎉</h1>
+            <h3 style="margin:10px 0 0 0;">Zwycięża: <strong>{game_state['winner']}</strong></h3>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if is_current_master:
+        st.write("")
+        if st.button("🚀 Grajcie dalej (Nowe rozdanie)", use_container_width=True, type="primary"):
+            game_state["winner"] = None
+            game_state["ended"] = False
+            game_state["game_id"] += 1
+            st.rerun()
+    else:
+        st.info("Czekamy na Lidera, aż rozpocznie nową rundę...")
+        
 else:
     if len(all_images) < required_images:
-        st.warning(f"W folderze 'images' masz tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzeba min. {required_images}!")
+        st.warning(f"Za mało zdjęć! Masz {len(all_images)}, a potrzebujesz min. {required_images}!")
     else:
         current_game_id = game_state["game_id"]
         
