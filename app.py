@@ -55,7 +55,21 @@ with col2:
 
 st.write("---")
 
-# --- PANEL LIDERA (RESET GRY I QR KOD NA GŁÓWNYM EKRANIE) ---
+# --- KOD QR BEZPOŚREDNIO NA EKRANIE Z PARAMETREM EMBEDDED ---
+with st.expander("📲 Pokaż kod QR do wspólnej gry dla pasażerów", expanded=False):
+    st.write("Zeskanuj ten kod telefonem pasażera:")
+    app_url = st.text_input("Link do gry:", "https://car-bingo.streamlit.app/?embedded=true", key="main_qr_url")
+    
+    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    qr.add_data(app_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buf = BytesIO()
+    img.save(buf)
+    st.image(buf.getvalue(), width=200)
+
+# --- PANEL LIDERA (RESET GRY) ---
 if is_master:
     st.subheader("⚙️ Panel Lidera")
     grid_choice = st.selectbox("Wybierz rozmiar planszy dla wszystkich:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"])
@@ -67,21 +81,6 @@ if is_master:
         game_state["ended"] = False
         game_state["game_id"] += 1
         st.rerun()
-
-    # Dodatkowa sekcja z QR kodem widoczna bezpośrednio na telefonie Lidera
-    with st.expander("📲 Pokaż kod QR do wspólnej gry"):
-        st.write("Zeskanuj ten kod innym telefonem:")
-        default_url = "https://car-bingo.streamlit.app"
-        app_url = st.text_input("Link do gry:", default_url, key="master_url")
-        
-        qr = qrcode.QRCode(version=1, box_size=10, border=2)
-        qr.add_data(app_url)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        buf = BytesIO()
-        img.save(buf)
-        st.image(buf.getvalue(), width=200)
 
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
@@ -113,7 +112,7 @@ else:
         # Wysokość dopasowana do siatki
         html_height = 800 if grid_size == 3 else (1000 if grid_size == 4 else 1200)
 
-        # KOD HTML/JS - Obsługa kliknięć, banera wygranej i dźwięku z imieniem
+        # KOD HTML/JS - Obsługa kliknięć, banera wygranej i głosu z imieniem
         html_code = f"""
         <style>
             .bingo-container {{
@@ -290,18 +289,14 @@ else:
             game_state["winner"] = player_name
             st.rerun()
 
-# --- QR KOD W BOCZNYM MENU (DLA LAPTOPÓW) ---
+# --- BOCZNE MENU ---
 with st.sidebar:
-    st.header("📲 Kod QR dla pasażerów")
-    st.write("Wpisz dokładny adres aplikacji:")
-    
-    app_url = st.text_input("Link do gry:", "https://car-bingo.streamlit.app", key="sidebar_url")
-    
-    qr = qrcode.QRCode(version=1, box_size=10, border=2)
-    qr.add_data(app_url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    
-    buf = BytesIO()
-    img.save(buf)
-    st.image(buf.getvalue(), width=220)
+    st.header("📲 Szybki QR")
+    app_url_sidebar = st.text_input("Link:", "https://car-bingo.streamlit.app/?embedded=true", key="sidebar_url")
+    qr_s = qrcode.QRCode(version=1, box_size=8, border=2)
+    qr_s.add_data(app_url_sidebar)
+    qr_s.make(fit=True)
+    img_s = qr_s.make_image(fill_color="black", back_color="white")
+    buf_s = BytesIO()
+    img_s.save(buf_s)
+    st.image(buf_s.getvalue(), width=180)
