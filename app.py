@@ -11,40 +11,52 @@ st.set_page_config(page_title="Auto Bingo", layout="wide")
 # Odświeżanie strony w tle co 3 sekundy (synchronizacja)
 st_autorefresh(interval=3000, limit=None, key="auto_refresh")
 
-# Ukrycie menu, stopki Streamlita, usunięcie górnego marginesu oraz stylizacja kompaktowych przycisków
+# Wymuszenie poziomego rzędu na telefonach, usunięcie marginesów i wymuszenie kwadratów
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Całkowite usunięcie górnego marginesu strony */
+    /* Usunięcie marginesów by dosunąć wszystko do samej góry */
     .block-container {
-        padding-top: 0.4rem !important;
+        padding-top: 0.2rem !important;
         padding-bottom: 0.5rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
     
-    /* Ograniczenie szerokości rzędu przycisków, aby były zgrabne i kwadratowe */
+    /* BLOKADA ZACHOWANIA MOBILNEGO: Wymuszenie poziomej linii na telefonach */
     div[data-testid="stHorizontalBlock"] {
-        display: flex;
-        width: 100%;
-        max-width: 400px;
-        gap: 8px;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        width: 100% !important;
+        max-width: 500px !important;
     }
-    div[data-testid="stHorizontalBlock"] > div {
-        flex: 1;
+    
+    /* Wymuszenie, aby każda z 4 kolumn zajmowała dokładnie 25% szerokości ekranu telefonu */
+    div[data-testid="column"] {
+        width: 25% !important;
+        flex: 1 1 25% !important;
+        min-width: 0 !important;
     }
-    div[data-testid="stHorizontalBlock"] button {
-        aspect-ratio: 1 / 1;
-        width: 100%;
-        min-height: 55px;
-        padding: 0px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        line-height: 1.1;
-        border-radius: 10px;
+    
+    /* Kształt przycisków: idealne kwadraty z wycentrowanym tekstem */
+    .stButton > button {
+        aspect-ratio: 1 / 1 !important;
+        width: 100% !important;
+        height: auto !important;
+        padding: 0px !important;
+        font-size: 0.85rem !important;
+        font-weight: bold !important;
+        line-height: 1.2 !important;
+        border-radius: 12px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
     </style>
 """
@@ -83,12 +95,12 @@ for key in ["show_qr", "show_settings", "show_reset"]:
         st.session_state[key] = False
 
 # Tytuł aplikacji przesunięty na samą górę
-st.markdown("<h1 style='margin-top: 0px; padding-top: 0px;'>🚗 Auto Bingo</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='margin-top: 0px; padding-top: 0px; text-align: center;'>🚗 Auto Bingo</h1>", unsafe_allow_html=True)
 
 player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
 st.session_state["player_name"] = player_name
 
-# --- PASEK STEROWANIA: 4 KWADRATOWE PRZYCISKI W POZIOMEJ LINII ---
+# --- PASEK STEROWANIA: 4 KWADRATOWE PRZYCISKI W POZIOMEJ LINII NA TELEFONIE ---
 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
 
 with col_b1:
