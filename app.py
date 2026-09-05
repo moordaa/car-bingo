@@ -4,7 +4,6 @@ import random
 import base64
 import qrcode
 from io import BytesIO
-import time
 
 st.set_page_config(page_title="Auto Bingo", layout="wide")
 
@@ -76,14 +75,14 @@ else:
     if len(all_images) < required_images:
         st.warning(f"W folderze 'images' znajduje się tylko {len(all_images)} zdjęć. Do planszy {grid_size}x{grid_size} potrzebujesz co najmniej {required_images} obrazków!")
     else:
-        # Generowanie nowej, unikalnej planszy przy zmianie id_gry (game_id)
         current_game_id = game_state["game_id"]
         
+        # Generowanie nowej planszy jeśli gra została zresetowana przez Lidera
         if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
             st.session_state["current_game_id"] = current_game_id
             st.session_state["bingo_grid"] = random.sample(all_images, required_images)
 
-        # Konwersja zdjęć na base64 do wysłania do widoku HTML
+        # Konwersja zdjęć na base64 do widoku HTML
         encoded_images = []
         for img_name in st.session_state["bingo_grid"]:
             img_path = os.path.join(IMAGE_DIR, img_name)
@@ -255,15 +254,11 @@ else:
 
         winner_signal = st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        # Rejestracja wygranej po odebraniu sygnału
+        # Rejestracja wygranej
         if winner_signal:
             game_state["ended"] = True
             game_state["winner"] = player_name
             st.rerun()
-
-    # Automatyczne odświeżanie w tle co 3 sekundy
-    time.sleep(3)
-    st.rerun()
 
 # Boczne menu z kodem QR
 with st.sidebar:
