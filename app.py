@@ -22,8 +22,6 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-st.title("🚗 Auto Bingo")
-
 # Stały, poprawny adres Twojej aplikacji na Render.com
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
@@ -46,6 +44,40 @@ if os.path.exists(IMAGE_DIR):
 else:
     all_images = []
 
+# Inicjalizacja stanu widoczności kodu QR
+if "show_qr" not in st.session_state:
+    st.session_state["show_qr"] = False
+
+# Górny nagłówek z przyciskiem QR
+col_title, col_btn = st.columns([4, 1])
+with col_title:
+    st.title("🚗 Auto Bingo")
+with col_btn:
+    st.write("") # małe wyrównanie w pionie
+    if st.button("📱 QR", use_container_width=True, type="secondary"):
+        st.session_state["show_qr"] = not st.session_state["show_qr"]
+        st.rerun()
+
+# Wyświetlanie kodu QR po kliknięciu ikonki
+if st.session_state["show_qr"]:
+    st.markdown("""
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 1px solid #ddd;">
+            <p style="color: #333; font-weight: bold; margin-bottom: 8px;">Zeskanuj kod, aby dołączyć do gry:</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col_q1, col_q2, col_q3 = st.columns([1, 2, 1])
+    with col_q2:
+        qr = qrcode.QRCode(version=1, box_size=8, border=2)
+        qr.add_data(RENDER_APP_URL)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buf = BytesIO()
+        img.save(buf)
+        st.image(buf.getvalue(), width=220)
+        st.caption(f"Link: {RENDER_APP_URL}")
+
 # --- IDENTYFIKACJA GRACZA ---
 col1, col2 = st.columns([2, 1])
 with col1:
@@ -57,21 +89,6 @@ with col2:
     is_master = st.checkbox("👑 Lider (Master)")
 
 st.write("---")
-
-# --- KOD QR NA GŁÓWNYM EKRANIE (NA SZTYWNO) ---
-with st.expander("📲 Pokaż kod QR do wspólnej gry dla pasażerów", expanded=False):
-    st.write("Zeskanuj ten kod telefonem pasażera:")
-    
-    # Generowanie kodu QR bezpośrednio ze stałego adresu Render.com
-    qr = qrcode.QRCode(version=1, box_size=10, border=2)
-    qr.add_data(RENDER_APP_URL)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    
-    buf = BytesIO()
-    img.save(buf)
-    st.image(buf.getvalue(), width=200)
-    st.caption(f"Link docelowy: {RENDER_APP_URL}")
 
 # --- PANEL LIDERA (RESET GRY) ---
 if is_master:
@@ -100,12 +117,10 @@ else:
     else:
         current_game_id = game_state["game_id"]
         
-        # Jeśli lider zresetował grę -> losuj nową planszę
         if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != current_game_id:
             st.session_state["current_game_id"] = current_game_id
             st.session_state["bingo_grid"] = random.sample(all_images, required_images)
 
-        # Base64 obrazków do HTML
         encoded_images = []
         for img_name in st.session_state["bingo_grid"]:
             img_path = os.path.join(IMAGE_DIR, img_name)
@@ -113,10 +128,8 @@ else:
                 encoded = base64.b64encode(f.read()).decode()
                 encoded_images.append(f"data:image/jpeg;base64,{encoded}")
 
-        # Wysokość dopasowana do siatki
         html_height = 800 if grid_size == 3 else (1000 if grid_size == 4 else 1200)
 
-        # KOD HTML/JS - Pełna obsługa dźwięku, banera i imienia zwycięzcy
         html_code = f"""
         <style>
             .bingo-container {{
@@ -287,13 +300,12 @@ else:
 
         st.components.v1.html(html_code, height=html_height, scrolling=False)
 
-        # Niewidzialny przycisk łączący przeglądarkę z serwerem
         if st.button("SYSTEM_WIN_BRIDGE", key="win_bridge"):
             game_state["ended"] = True
             game_state["winner"] = player_name
             st.rerun()
 
-# --- BOCZNE MENU ---
+# --- BOCZNY QR (DODATKOWO) ---
 with st.sidebar:
     st.header("📲 Szybki QR")
     qr_s = qrcode.QRCode(version=1, box_size=8, border=2)
@@ -303,4 +315,3 @@ with st.sidebar:
     buf_s = BytesIO()
     img_s.save(buf_s)
     st.image(buf_s.getvalue(), width=180)
-    st.caption(RENDER_APP_URL)
