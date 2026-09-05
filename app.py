@@ -106,7 +106,7 @@ else:
         st.session_state["confirm_restart"] = False
         st.rerun()
 
-# 4. Rozmiar planszy (każdy ma równe uprawnienia)
+# 4. Rozmiar planszy
 idx = 0
 if game_state["grid_size"] == 4: idx = 1
 elif game_state["grid_size"] == 5: idx = 2
@@ -122,7 +122,7 @@ if new_size != game_state["grid_size"]:
     game_state["player_states"] = {}
     st.rerun()
 
-# 5. Odśwież
+# 5. Odśwież stan
 if st.button("🔄 Odśwież stan", use_container_width=True):
     st.rerun()
 
@@ -212,7 +212,6 @@ else:
             const playerName = "{player_name}";
             const mySessionId = "{st.session_state['my_session_id']}";
 
-            // Zabezpieczenie przed przypadkowym odświeżeniem lub zamknięciem strony (np. przypadkowy gest swipe-down)
             window.addEventListener('beforeunload', function (e) {{
                 e.preventDefault();
                 e.returnValue = '';
@@ -226,6 +225,8 @@ else:
                         if (container) container.style.display = 'none';
                     }}
                 }});
+                // Automatyczne przesłanie stanu przy załadowaniu/odświeżeniu
+                sendStateToServer();
             }}
 
             function generateWinPatterns(size) {{
@@ -340,6 +341,10 @@ else:
             game_state["ended"] = True
             game_state["winner"] = player_name
             st.rerun()
+
+        # Inicjalizacja wpisu dla siebie, aby serwer widział Twoją sesję
+        if st.session_state["my_session_id"] not in game_state["player_states"]:
+            game_state["player_states"][st.session_state["my_session_id"]] = {"name": player_name, "checked": [False]*required_images}
 
         other_players = {sid: pdata for sid, pdata in game_state["player_states"].items() if sid != st.session_state["my_session_id"]}
         
