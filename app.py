@@ -74,29 +74,39 @@ if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encode
 
 st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
-# --- PANEL STEROWANIA (KAŻDY MA IDENTYCZNE UPRAWNIENIA) ---
-col_ctrl1, col_ctrl2 = st.columns([1, 1])
+# --- KOLEJNOŚĆ INTERFEJSU OD GÓRY ---
 
-with col_ctrl1:
-    if st.button("🔄 Odśwież stan", use_container_width=True):
+# 1. QR Code
+with st.expander("📲 Pokaż kod QR", expanded=False):
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    qr = qrcode.QRCode(version=1, box_size=5, border=1)
+    qr.add_data(RENDER_APP_URL)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf)
+    st.image(buf.getvalue(), width=140)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# 2. Nazwa pasażera
+player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
+st.session_state["player_name"] = player_name
+
+# 3. Nowe rozdanie (z potwierdzeniem)
+if not st.session_state["confirm_restart"]:
+    if st.button("🚀 Nowe rozdanie (Restart)", use_container_width=True, type="secondary"):
+        st.session_state["confirm_restart"] = True
+        st.rerun()
+else:
+    if st.button("⚠️ Potwierdź nowe rozdanie", use_container_width=True, type="primary"):
+        game_state["winner"] = None
+        game_state["ended"] = False
+        game_state["game_id"] += 1
+        game_state["player_states"] = {}
+        st.session_state["confirm_restart"] = False
         st.rerun()
 
-with col_ctrl2:
-    if not st.session_state["confirm_restart"]:
-        if st.button("🚀 Restart gry", use_container_width=True, type="secondary"):
-            st.session_state["confirm_restart"] = True
-            st.rerun()
-    else:
-        if st.button("⚠️ Potwierdź restart", use_container_width=True, type="primary"):
-            game_state["winner"] = None
-            game_state["ended"] = False
-            game_state["game_id"] += 1
-            game_state["player_states"] = {}
-            st.session_state["confirm_restart"] = False
-            st.rerun()
-
-# Wybór wielkości planszy dostępny dla każdego na równych prawach
-st.markdown("<div style='background: #f0f2f6; padding: 10px; border-radius: 8px; margin: 8px 0;'>", unsafe_allow_html=True)
+# 4. Rozmiar planszy (każdy ma równe uprawnienia)
 idx = 0
 if game_state["grid_size"] == 4: idx = 1
 elif game_state["grid_size"] == 5: idx = 2
@@ -112,21 +122,9 @@ if new_size != game_state["grid_size"]:
     game_state["player_states"] = {}
     st.rerun()
 
-st.markdown("</div>", unsafe_allow_html=True)
-
-player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
-st.session_state["player_name"] = player_name
-
-with st.expander("📲 Pokaż kod QR", expanded=False):
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    qr = qrcode.QRCode(version=1, box_size=5, border=1)
-    qr.add_data(RENDER_APP_URL)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf)
-    st.image(buf.getvalue(), width=140)
-    st.markdown("</div>", unsafe_allow_html=True)
+# 5. Odśwież
+if st.button("🔄 Odśwież stan", use_container_width=True):
+    st.rerun()
 
 st.write("")
 
