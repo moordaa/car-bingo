@@ -31,9 +31,8 @@ def get_game_state():
         "winner": None,
         "ended": False,
         "game_id": 1,
-        "bingo_grid": [],
-        "encoded_images": [],
-        "last_game_id": 0
+        "all_images": [],
+        "last_global_id": 0
     }
 
 game_state = get_game_state()
@@ -56,7 +55,9 @@ if "confirm_restart" not in st.session_state:
 grid_size = game_state["grid_size"]
 required_images = grid_size * grid_size
 
-if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encoded_images"]) != required_images:
+# Sprawdzamy, czy zmieniła się runda lub rozmiar planszy
+if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != game_state["game_id"] or "my_encoded_images" not in st.session_state:
+    st.session_state["current_game_id"] = game_state["game_id"]
     if len(all_images) >= required_images:
         selected_imgs = random.sample(all_images, required_images)
         encoded_list = []
@@ -65,9 +66,9 @@ if game_state["last_game_id"] != game_state["game_id"] or len(game_state["encode
             with open(img_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode()
                 encoded_list.append(f"data:image/jpeg;base64,{encoded}")
-        game_state["bingo_grid"] = selected_imgs
-        game_state["encoded_images"] = encoded_list
-        game_state["last_game_id"] = game_state["game_id"]
+        st.session_state["my_encoded_images"] = encoded_list
+    else:
+        st.session_state["my_encoded_images"] = []
 
 st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
 
@@ -151,7 +152,7 @@ else:
         st.warning(f"Za mało zdjęć! Masz {len(all_images)}, potrzebujesz min. {required_images}!")
     else:
         html_height = 750 if grid_size == 3 else (950 if grid_size == 4 else 1150)
-        encoded_images = game_state["encoded_images"]
+        encoded_images = st.session_state["my_encoded_images"]
 
         html_code = f"""
         <style>
