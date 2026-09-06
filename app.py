@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ukrycie domyślnych elementów Streamlita i stylizacja
+# Ukrycie domyślnych elementów Streamlita
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -23,49 +23,8 @@ hide_streamlit_style = """
         padding-left: 0.2rem !important;
         padding-right: 0.2rem !important;
     }
-    
-    /* Kompaktowa siatka 5x5 mieszcząca się w całości na ekranie */
-    .bingo-container {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 4px;
-        width: 100%;
-        max-width: 480px;
-        margin: auto;
-    }
-    .bingo-card {
-        position: relative;
-        width: 100%;
-        padding-top: 85%; /* Zmniejszona wysokość kafelka */
-        border-radius: 6px;
-        overflow: hidden;
-        background-color: #ffffff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        cursor: pointer;
-        user-select: none;
-    }
-    .bingo-card img {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: contain; /* Pomniejszenie obrazka do kafelka */
-        padding: 2px;
-        box-sizing: border-box;
-        transition: filter 0.2s;
-    }
-    .bingo-card.checked img {
-        filter: grayscale(80%) brightness(30%);
-    }
-    .bingo-card.checked::after {
-        content: "❌";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 1.8rem;
-        pointer-events: none;
+    div[data-testid="stButton"]:has(button:contains("CLOSE_QR_BRIDGE")) {
+        display: none !important;
     }
     </style>
 """
@@ -84,11 +43,13 @@ else:
 if "game_id" not in st.session_state:
     st.session_state["game_id"] = 1
 
+if "show_qr" not in st.session_state:
+    st.session_state["show_qr"] = False
+
 def generate_encoded_images():
     if not all_images:
         return []
 
-    # Generowanie dokładnie 25 elementów (z powtórzeniami, jeśli plików jest mniej niż 25)
     selected_imgs = [random.choice(all_images) for _ in range(REQUIRED_IMAGES)]
 
     encoded_list = []
@@ -106,10 +67,12 @@ if "my_encoded_images" not in st.session_state or len(st.session_state["my_encod
 
 st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
 
-# Przyciski sterujące pod nazwą gry
+# Przyciski sterujące
 col1, col2 = st.columns(2)
 with col1:
-    show_qr = st.button("📲 Kod QR", use_container_width=True, type="secondary")
+    if st.button("📲 Kod QR", use_container_width=True, type="secondary"):
+        st.session_state["show_qr"] = True
+        st.rerun()
 
 with col2:
     if st.button("🚀 Reset / Nowa plansza", use_container_width=True, type="primary"):
@@ -117,27 +80,43 @@ with col2:
         st.session_state["my_encoded_images"] = generate_encoded_images()
         st.rerun()
 
+# Ukryty przycisk do zamykania z poziomu JS
+if st.button("CLOSE_QR_BRIDGE", key="close_qr_bridge"):
+    st.session_state["show_qr"] = False
+    st.rerun()
+
 # Pełnoekranowy kod QR
-if show_qr:
+if st.session_state["show_qr"]:
     qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={RENDER_APP_URL}"
     st.markdown(f"""
-        <div style="
+        <div id="qrModalOverlay" onclick="closeQrModal()" style="
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
-            background-color: rgba(0, 0, 0, 0.9);
+            background-color: rgba(0, 0, 0, 0.92);
             z-index: 999999;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             color: white;
+            cursor: pointer;
         ">
-            <h2 style="margin-bottom: 20px;">Zeskanuj, aby dołączyć</h2>
-            <img src="{qr_code_url}" style="width: 250px; height: 250px; border-radius: 12px; background: white; padding: 10px;">
+            <h2 style="margin-bottom: 15px; pointer-events: none;">Zeskanuj, aby dołączyć</h2>
+            <img src="{qr_code_url}" style="width: 260px; height: 260px; border-radius: 12px; background: white; padding: 10px; pointer-events: none;">
+            <p style="margin-top: 15px; font-size: 0.85rem; color: #aaa; pointer-events: none;">Dotknij gdziekolwiek, aby zamknąć</p>
         </div>
+
+        <script>
+            function closeQrModal() {{
+                const buttons = window.parent.document.querySelectorAll('button');
+                buttons.forEach(btn => {{
+                    if (btn.innerText.includes('CLOSE_QR_BRIDGE')) {{
+                        btn.click();
+                    }}
+                }});
+            }}
+        </script>
     """, unsafe_allow_html=True)
-    if st.button("❌ Zamknij Kod QR", type="primary", use_container_width=True):
-        st.rerun()
 
 if len(all_images) == 0:
     st.warning("Brak grafik w folderze 'images'. Dodaj pliki do repozytorium, aby rozpocząć grę.")
@@ -145,6 +124,57 @@ else:
     encoded_images = st.session_state["my_encoded_images"]
     
     html_code = f"""
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+        }}
+        .bingo-container {{
+            display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            gap: 4px !important;
+            width: 100% !important;
+            max-width: 480px !important;
+            margin: auto !important;
+        }}
+        .bingo-card {{
+            position: relative !important;
+            width: 100% !important;
+            padding-top: 100% !important;
+            border-radius: 6px !important;
+            overflow: hidden !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+            cursor: pointer !important;
+            user-select: none !important;
+            box-sizing: border-box !important;
+        }}
+        .bingo-card img {{
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+            padding: 3px !important;
+            box-sizing: border-box !important;
+            transition: filter 0.2s !important;
+        }}
+        .bingo-card.checked img {{
+            filter: grayscale(80%) brightness(30%) !important;
+        }}
+        .bingo-card.checked::after {{
+            content: "❌" !important;
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            font-size: 1.8rem !important;
+            pointer-events: none !important;
+        }}
+    </style>
+
     <div class="bingo-container" id="bingoGrid">
         {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
     </div>
@@ -247,4 +277,4 @@ else:
     </script>
     """
 
-    st.components.v1.html(html_code, height=620, scrolling=False)
+    st.components.v1.html(html_code, height=520, scrolling=False)
