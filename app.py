@@ -4,7 +4,6 @@ import base64
 import json
 import streamlit as st
 
-# Config strony
 st.set_page_config(
     page_title="Auto Bingo",
     page_icon="🚗",
@@ -12,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Ukrycie domyślnych elementów Streamlita
 hide_streamlit_style = """
     <style>
     #MainMenu {visibility: hidden;}
@@ -29,10 +27,9 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 IMAGE_DIR = "images"
-REQUIRED_IMAGES = 25  # Wymagane 25 unikalnych obrazków dla siatki 5x5
+REQUIRED_IMAGES = 25
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Wczytanie listy plików
 if os.path.exists(IMAGE_DIR):
     all_images = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))]
 else:
@@ -58,11 +55,8 @@ def generate_encoded_images():
 if "my_encoded_images" not in st.session_state:
     st.session_state["my_encoded_images"] = generate_encoded_images()
 
-# --- INTERFEJS APLIKACJI ---
-
 st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 10px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
 
-# Przycisk resetu/nowej planszy
 if st.button("🚀 Nowa plansza / Reset", use_container_width=True, type="primary"):
     st.session_state["game_id"] += 1
     st.session_state["my_encoded_images"] = generate_encoded_images()
@@ -121,7 +115,6 @@ else:
             transition: filter 0.2s !important;
         }}
         
-        /* Osobna warstwa nakładki zakrywająca cały kafelek */
         .cross-overlay {{
             display: none;
             position: absolute !important;
@@ -138,7 +131,6 @@ else:
             box-sizing: border-box !important;
         }}
 
-        /* Pokazywanie nakładki przy zaznaczeniu */
         .bingo-card.checked .cross-overlay {{
             display: flex !important;
         }}
@@ -168,7 +160,6 @@ else:
         <h3 style="margin:0;">🎉 BINGO! Wygrałem, leszcze! 🎉</h3>
     </div>
 
-    <!-- Kod QR daleko pod planszą -->
     <div class="qr-section">
         <h4 style="margin: 0 0 5px 0;">Zeskanuj, aby grać na swoim telefonie</h4>
         <img src="{qr_code_url}" alt="Kod QR Dołączenia">
@@ -272,6 +263,28 @@ else:
             }} catch(e) {{}}
         }}
 
+        function triggerConfetti() {{
+            for (let i = 0; i < 35; i++) {{
+                const confetti = document.createElement('div');
+                confetti.innerText = ['🚗', '🎉', '⭐', '🏆'][Math.floor(Math.random() * 4)];
+                confetti.style.position = 'fixed';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.top = '-5vh';
+                confetti.style.fontSize = (Math.random() * 20 + 15) + 'px';
+                confetti.style.zIndex = '99999';
+                confetti.style.transition = 'all 2s ease-out';
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => {{
+                    confetti.style.top = '105vh';
+                    confetti.style.transform = `rotate(${{Math.random() * 360}}deg)`;
+                    confetti.style.opacity = '0';
+                }}, 50);
+
+                setTimeout(() => confetti.remove(), 2100);
+            }}
+        }}
+
         function checkBingo(playSound = true) {{
             const cards = document.querySelectorAll('.bingo-card');
             const checked = Array.from(cards).map(card => card.classList.contains('checked'));
@@ -283,6 +296,7 @@ else:
                 if (banner.style.display === 'none' && playSound) {{
                     playVictorySound();
                     speakWin();
+                    triggerConfetti();
                 }}
                 banner.style.display = 'block';
             }} else {{
@@ -294,10 +308,13 @@ else:
 
         function toggleCard(card) {{
             card.classList.toggle('checked');
+            if (navigator.vibrate) {{
+                navigator.vibrate(30);
+            }}
             saveState();
             checkBingo(true);
         }}
     </script>
     """
 
-    st.components.v1.html(html_code, height=1050, scrolling=True)
+    st.components.v1.html(html_code, height=1200, scrolling=True)
