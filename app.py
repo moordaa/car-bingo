@@ -165,7 +165,7 @@ else:
     <div class="bingo-container" id="bingoGrid"></div>
 
     <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 15px;">
-        <h3 style="margin:0;">🎉 BINGO - wygrałem leszcze! 🎉</h3>
+        <h3 style="margin:0;">🎉 BINGO! Wygrałem, leszcze! 🎉</h3>
     </div>
 
     <!-- Kod QR daleko pod planszą -->
@@ -244,7 +244,7 @@ else:
         function speakWin() {{
             if ('speechSynthesis' in window) {{
                 window.speechSynthesis.cancel();
-                const msg = new SpeechSynthesisUtterance("BINGO - wygrałem leszcze!");
+                const msg = new SpeechSynthesisUtterance("BINGO! Wygrałem, leszcze!");
                 msg.lang = 'pl-PL';
                 msg.rate = 1.0;
                 msg.pitch = 1.1;
