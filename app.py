@@ -7,31 +7,26 @@ st.set_page_config(
     page_title="Auto Bingo",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Poprawiony CSS - tworzy równe, estetyczne kafelki dla obrazków
+# Poprawiony CSS - równe kafelki i brak ucinania
 st.markdown("""
     <style>
-    /* Ujednolicenie rozmiaru obrazków i dodanie białego tła dla przezroczystych PNG */
     [data-testid="stImage"] img {
         object-fit: contain !important;
-        height: 120px !important;
+        height: 100px !important; /* Nieco niższe, żeby plansza 5x5 lepiej mieściła się na ekranie */
         width: 100%;
         background-color: white; 
         border-radius: 8px;
         padding: 5px;
     }
-    
-    /* Zmniejszenie ogromnych odstępów Streamlita między grafiką a przyciskiem */
     div[data-testid="column"] > div > div > div > div {
         gap: 0.2rem !important;
     }
-    
-    /* Wyśrodkowanie kolumn */
     div[data-testid="column"] {
         text-align: center;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -39,12 +34,13 @@ st.markdown("""
 # Definicje ścieżek i stałych
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGE_DIR = os.path.join(BASE_DIR, "images")
+GRID_SIZE = 25 # Układ 5x5
 
 # Inicjalizacja stanu sesji gracza
 if 'board' not in st.session_state:
     st.session_state.board = []
 if 'checked' not in st.session_state:
-    st.session_state.checked = [False] * 16
+    st.session_state.checked = [False] * GRID_SIZE
 
 def load_images():
     """Wczytanie dostępnych plików graficznych z folderu images."""
@@ -55,18 +51,32 @@ def load_images():
     return sorted(files)
 
 def generate_new_board():
-    """Generowanie nowej planszy 4x4 (16 losowych kafelków)."""
+    """Generowanie nowej planszy 5x5 (25 losowych kafelków)."""
     images = load_images()
-    if len(images) < 16:
-        if len(images) > 0:
-            st.session_state.board = [random.choice(images) for _ in range(16)]
-        else:
-            st.session_state.board = []
+    if len(images) == 0:
+        st.session_state.board = []
+    elif len(images) < GRID_SIZE:
+        st.session_state.board = [random.choice(images) for _ in range(GRID_SIZE)]
     else:
-        st.session_state.board = random.sample(images, 16)
-    st.session_state.checked = [False] * 16
+        st.session_state.board = random.sample(images, GRID_SIZE)
+    st.session_state.checked = [False] * GRID_SIZE
 
-# Nagłówek aplikacji
+# --- MENU BOCZNE ---
+with st.sidebar:
+    st.header("⚙️ Menu Gry")
+    
+    if st.button("🔄 Nowa plansza", type="primary", use_container_width=True):
+        generate_new_board()
+        st.rerun()
+        
+    if st.button("🗑️ Odznacz wszystko", use_container_width=True):
+        st.session_state.checked = [False] * GRID_SIZE
+        st.rerun()
+        
+    st.write("---")
+    st.info("Zauważyłeś obiekt za oknem? Kliknij przycisk z jego nazwą na planszy, aby go zaznaczyć. Zdobądź całą planszę, aby wygrać!")
+
+# --- GŁÓWNA APLIKACJA ---
 st.title("🚗 Auto Bingo")
 
 images_available = load_images()
@@ -74,36 +84,28 @@ images_available = load_images()
 if len(images_available) == 0:
     st.warning("Brak grafik w folderze 'images'. Dodaj pliki graficzne, aby rozpocząć grę.")
 else:
-    # Wygeneruj planszę przy pierwszym uruchomieniu
-    if not st.session_state.board:
+    # Wygeneruj planszę przy pierwszym uruchomieniu lub jeśli ma zły rozmiar
+    if not st.session_state.board or len(st.session_state.board) != GRID_SIZE:
         generate_new_board()
 
-    # Przycisk nowej gry
-    if st.button("🔄 Nowa plansza", type="primary", use_container_width=True):
-        generate_new_board()
-        st.rerun()
-
-    st.write("---")
-
-    # Wyświetlanie siatki Bingo 4x4
+    # Wyświetlanie siatki Bingo 5x5
     board = st.session_state.board
-    for row in range(4):
-        cols = st.columns(4)
-        for col in range(4):
-            idx = row * 4 + col
+    for row in range(5):
+        cols = st.columns(5)
+        for col in range(5):
+            idx = row * 5 + col
             with cols[col]:
                 if idx < len(board):
                     img_name = board[idx]
                     img_path = os.path.join(IMAGE_DIR, img_name)
                     
-                    # Nazwa wyświetlana na przycisku
                     clean_name = os.path.splitext(img_name)[0].replace("-", " ").replace("_", " ")
 
                     # Obrazek
                     if os.path.exists(img_path):
                         st.image(img_path, use_container_width=True)
                     
-                    # Przycisk pod obrazkiem
+                    # Przycisk
                     is_checked = st.session_state.checked[idx]
                     btn_label = f"✅ {clean_name}" if is_checked else clean_name
                     btn_type = "primary" if is_checked else "secondary"
