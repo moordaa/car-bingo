@@ -121,7 +121,7 @@ else:
             transition: filter 0.2s !important;
         }}
         
-        /* Osobna warstwa nakładki zakrywająca Cały kafelek 100% x 100% */
+        /* Osobna warstwa nakładki zakrywająca cały kafelek */
         .cross-overlay {{
             display: none;
             position: absolute !important;
@@ -165,7 +165,7 @@ else:
     <div class="bingo-container" id="bingoGrid"></div>
 
     <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 15px;">
-        <h3 style="margin:0;">🎉 BINGO! WYGRAŁEM! 🎉</h3>
+        <h3 style="margin:0;">🎉 BINGO - wygrałem leszcze! 🎉</h3>
     </div>
 
     <!-- Kod QR daleko pod planszą -->
@@ -244,7 +244,7 @@ else:
         function speakWin() {{
             if ('speechSynthesis' in window) {{
                 window.speechSynthesis.cancel();
-                const msg = new SpeechSynthesisUtterance("BINGO! WYGRAŁEM!");
+                const msg = new SpeechSynthesisUtterance("BINGO - wygrałem leszcze!");
                 msg.lang = 'pl-PL';
                 msg.rate = 1.0;
                 msg.pitch = 1.1;
