@@ -23,9 +23,6 @@ hide_streamlit_style = """
         padding-left: 0.2rem !important;
         padding-right: 0.2rem !important;
     }
-    div[data-testid="stButton"]:has(button:contains("CLOSE_QR_BRIDGE")) {
-        display: none !important;
-    }
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -42,9 +39,6 @@ else:
 
 if "game_id" not in st.session_state:
     st.session_state["game_id"] = 1
-
-if "show_qr" not in st.session_state:
-    st.session_state["show_qr"] = False
 
 def generate_encoded_images():
     if not all_images:
@@ -70,9 +64,12 @@ st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>
 # Przyciski sterujące
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("📲 Kod QR", use_container_width=True, type="secondary"):
-        st.session_state["show_qr"] = True
-        st.rerun()
+    st.markdown("""
+        <button onclick="document.getElementById('qrModalOverlay').style.display='flex'" 
+                style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid #4a4a4a; background-color: #262730; color: white; cursor: pointer; font-weight: bold;">
+            📲 Kod QR
+        </button>
+    """, unsafe_allow_html=True)
 
 with col2:
     if st.button("🚀 Reset / Nowa plansza", use_container_width=True, type="primary"):
@@ -80,43 +77,26 @@ with col2:
         st.session_state["my_encoded_images"] = generate_encoded_images()
         st.rerun()
 
-# Ukryty przycisk do zamykania z poziomu JS
-if st.button("CLOSE_QR_BRIDGE", key="close_qr_bridge"):
-    st.session_state["show_qr"] = False
-    st.rerun()
-
-# Pełnoekranowy kod QR
-if st.session_state["show_qr"]:
-    qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={RENDER_APP_URL}"
-    st.markdown(f"""
-        <div id="qrModalOverlay" onclick="closeQrModal()" style="
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background-color: rgba(0, 0, 0, 0.92);
-            z-index: 999999;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            cursor: pointer;
-        ">
-            <h2 style="margin-bottom: 15px; pointer-events: none;">Zeskanuj, aby dołączyć</h2>
-            <img src="{qr_code_url}" style="width: 260px; height: 260px; border-radius: 12px; background: white; padding: 10px; pointer-events: none;">
-            <p style="margin-top: 15px; font-size: 0.85rem; color: #aaa; pointer-events: none;">Dotknij gdziekolwiek, aby zamknąć</p>
-        </div>
-
-        <script>
-            function closeQrModal() {{
-                const buttons = window.parent.document.querySelectorAll('button');
-                buttons.forEach(btn => {{
-                    if (btn.innerText.includes('CLOSE_QR_BRIDGE')) {{
-                        btn.click();
-                    }}
-                }});
-            }}
-        </script>
-    """, unsafe_allow_html=True)
+# Pełnoekranowy kod QR (sam w sobie jest przyciskiem do zamykania)
+qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={RENDER_APP_URL}"
+st.markdown(f"""
+    <div id="qrModalOverlay" onclick="this.style.display='none'" style="
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background-color: rgba(0, 0, 0, 0.92);
+        z-index: 999999;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        cursor: pointer;
+    ">
+        <h2 style="margin-bottom: 15px; pointer-events: none;">Zeskanuj, aby dołączyć</h2>
+        <img src="{qr_code_url}" style="width: 260px; height: 260px; border-radius: 12px; background: white; padding: 10px; pointer-events: none;">
+        <p style="margin-top: 15px; font-size: 0.85rem; color: #aaa; pointer-events: none;">Dotknij w dowolnym miejscu, aby zamknąć</p>
+    </div>
+""", unsafe_allow_html=True)
 
 if len(all_images) == 0:
     st.warning("Brak grafik w folderze 'images'. Dodaj pliki do repozytorium, aby rozpocząć grę.")
