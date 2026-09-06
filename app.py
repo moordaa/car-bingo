@@ -55,10 +55,7 @@ def generate_encoded_images():
 if "my_encoded_images" not in st.session_state:
     st.session_state["my_encoded_images"] = generate_encoded_images()
 
-st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
-
-# Licznik wygranych renderowany dynamicznie przez JS
-st.markdown("<p id='winCounter' style='text-align: center; font-size: 0.9rem; color: #888; margin-bottom: 10px;'>Liczba wygranych: 0</p>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 10px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
 
 if st.button("🚀 Nowa plansza / Reset", use_container_width=True, type="primary"):
     st.session_state["game_id"] += 1
@@ -185,16 +182,6 @@ else:
             localStorage.removeItem('bingo_checked_state');
         }}
 
-        // Aktualizacja licznika wygranych na ekranie
-        function updateWinCounterDisplay() {{
-            const wins = localStorage.getItem('bingo_total_wins') || 0;
-            const counterEl = window.parent.document.getElementById('winCounter');
-            if (counterEl) {{
-                counterEl.innerText = "Liczba wygranych: " + wins;
-            }}
-        }}
-        updateWinCounterDisplay();
-
         function renderBoard() {{
             const grid = document.getElementById('bingoGrid');
             grid.innerHTML = activeImages.map((imgUrl, i) => 
@@ -276,29 +263,6 @@ else:
             }} catch(e) {{}}
         }}
 
-        function triggerConfetti() {{
-            for (let i = 0; i < 35; i++) {{
-                const confetti = document.createElement('div');
-                confetti.innerText = ['🚗', '🎉', '⭐', '🏆'][Math.floor(Math.random() * 4)];
-                confetti.style.position = 'fixed';
-                confetti.style.left = Math.random() * 100 + 'vw';
-                confetti.style.top = '-5vh';
-                confetti.style.fontSize = (Math.random() * 20 + 15) + 'px';
-                confetti.style.zIndex = '99999';
-                confetti.style.transition = 'all 2s ease-out';
-                document.body.appendChild(confetti);
-                
-                setTimeout(() => {{
-                    confetti.style.top = '105vh';
-                    confetti.style.transform = `rotate(${{\\
-                        Math.random() * 360}}deg)`;
-                    confetti.style.opacity = '0';
-                }}, 50);
-
-                setTimeout(() => confetti.remove(), 2100);
-            }}
-        }}
-
         function checkBingo(playSound = true) {{
             const cards = document.querySelectorAll('.bingo-card');
             const checked = Array.from(cards).map(card => card.classList.contains('checked'));
@@ -310,12 +274,6 @@ else:
                 if (banner.style.display === 'none' && playSound) {{
                     playVictorySound();
                     speakWin();
-                    triggerConfetti();
-                    
-                    // Zapis wygranej do licznika
-                    let currentWins = parseInt(localStorage.getItem('bingo_total_wins') || '0');
-                    localStorage.setItem('bingo_total_wins', currentWins + 1);
-                    updateWinCounterDisplay();
                 }}
                 banner.style.display = 'block';
             }} else {{
@@ -327,9 +285,6 @@ else:
 
         function toggleCard(card) {{
             card.classList.toggle('checked');
-            if (navigator.vibrate) {{
-                navigator.vibrate(30);
-            }}
             saveState();
             checkBingo(true);
         }}
