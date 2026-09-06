@@ -10,21 +10,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Styl CSS zapewniający, że obrazki nie będą obcinane (object-fit: contain)
+# Poprawiony CSS - tworzy równe, estetyczne kafelki dla obrazków
 st.markdown("""
     <style>
-    /* Zapobieganie ucinań i zachowanie pełnych proporcji obrazka */
+    /* Ujednolicenie rozmiaru obrazków i dodanie białego tła dla przezroczystych PNG */
     [data-testid="stImage"] img {
         object-fit: contain !important;
-        max-height: 120px;
+        height: 120px !important;
         width: 100%;
-        margin: 0 auto;
-        display: block;
+        background-color: white; 
+        border-radius: 8px;
+        padding: 5px;
     }
     
-    /* Dodatkowe wyśrodkowanie i estetyczny wygląd kafelków */
+    /* Zmniejszenie ogromnych odstępów Streamlita między grafiką a przyciskiem */
+    div[data-testid="column"] > div > div > div > div {
+        gap: 0.2rem !important;
+    }
+    
+    /* Wyśrodkowanie kolumn */
     div[data-testid="column"] {
         text-align: center;
+        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -32,7 +39,6 @@ st.markdown("""
 # Definicje ścieżek i stałych
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGE_DIR = os.path.join(BASE_DIR, "images")
-RENDER_APP_URL = "https://car-bingo.onrender.com"
 
 # Inicjalizacja stanu sesji gracza
 if 'board' not in st.session_state:
@@ -52,7 +58,6 @@ def generate_new_board():
     """Generowanie nowej planszy 4x4 (16 losowych kafelków)."""
     images = load_images()
     if len(images) < 16:
-        # Jeśli grafiki się powtarzają, uzupełniamy losowaniem z powtórzeniami
         if len(images) > 0:
             st.session_state.board = [random.choice(images) for _ in range(16)]
         else:
@@ -67,7 +72,7 @@ st.title("🚗 Auto Bingo")
 images_available = load_images()
 
 if len(images_available) == 0:
-    st.warning("Brak grafik w folderze 'images'. Dodaj pliki graficzne do repozytorium, aby rozpocząć grę.")
+    st.warning("Brak grafik w folderze 'images'. Dodaj pliki graficzne, aby rozpocząć grę.")
 else:
     # Wygeneruj planszę przy pierwszym uruchomieniu
     if not st.session_state.board:
@@ -91,14 +96,14 @@ else:
                     img_name = board[idx]
                     img_path = os.path.join(IMAGE_DIR, img_name)
                     
-                    # Nazwa wyświetlana (usuwa rozszerzenie i czyści znaki)
+                    # Nazwa wyświetlana na przycisku
                     clean_name = os.path.splitext(img_name)[0].replace("-", " ").replace("_", " ")
 
-                    # Obrazek dopasowany do okienka bez obcinania
+                    # Obrazek
                     if os.path.exists(img_path):
                         st.image(img_path, use_container_width=True)
                     
-                    # Przycisk zliczenia/zaznaczenia kafelka
+                    # Przycisk pod obrazkiem
                     is_checked = st.session_state.checked[idx]
                     btn_label = f"✅ {clean_name}" if is_checked else clean_name
                     btn_type = "primary" if is_checked else "secondary"
@@ -107,7 +112,7 @@ else:
                         st.session_state.checked[idx] = not st.session_state.checked[idx]
                         st.rerun()
 
-    # Sprawdzanie wygranej (opcjonalny komunikat)
+    # Sprawdzanie wygranej
     if all(st.session_state.checked):
         st.balloons()
         st.success("🎉 GRATULACJE! Wszystkie pola zaznaczone!")
