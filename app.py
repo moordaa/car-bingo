@@ -20,9 +20,16 @@ if "game_id" not in st.session_state:
 def generate_encoded_images():
     if len(all_images) < REQUIRED_IMAGES:
         return []
-    return [f"data:image/jpeg;base64,{base64.b64encode(open(os.path.join(IMAGE_DIR, img), 'rb').read()).decode()}" for img in random.sample(all_images, REQUIRED_IMAGES)]
+    selected = random.sample(all_images, REQUIRED_IMAGES)
+    encoded = []
+    for img in selected:
+        path = os.path.join(IMAGE_DIR, img)
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+            encoded.append(f"data:image/jpeg;base64,{b64}")
+    return encoded
 
-if "my_encoded_images" not in st.session_state:
+if "my_encoded_images" not in st.session_state or not st.session_state["my_encoded_images"]:
     st.session_state["my_encoded_images"] = generate_encoded_images()
 
 st.markdown("<h3 style='text-align: center; margin: 0 0 10px 0;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
@@ -37,7 +44,7 @@ st.write("")
 if len(all_images) < REQUIRED_IMAGES:
     st.error(f"W folderze 'images' jest tylko {len(all_images)} grafik. Wymagane min. 25 unikalnych obrazków!")
 else:
-    encoded_images = st.session_state["my_encoded_images"] or generate_encoded_images()
+    encoded_images = st.session_state["my_encoded_images"]
     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={RENDER_APP_URL}"
 
     html_code = f"""
