@@ -1,120 +1,310 @@
+import streamlit as st
 import os
 import random
-import streamlit as st
+import base64
+import qrcode
+from io import BytesIO
 
-# Config strony
-st.set_page_config(
-    page_title="Auto Bingo",
-    page_icon="🚗",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Auto Bingo", layout="centered")
 
-# Poprawiony CSS - równe kafelki i brak ucinania
-st.markdown("""
+hide_streamlit_style = """
     <style>
-    [data-testid="stImage"] img {
-        object-fit: contain !important;
-        height: 100px !important; /* Nieco niższe, żeby plansza 5x5 lepiej mieściła się na ekranie */
-        width: 100%;
-        background-color: white; 
-        border-radius: 8px;
-        padding: 5px;
-    }
-    div[data-testid="column"] > div > div > div > div {
-        gap: 0.2rem !important;
-    }
-    div[data-testid="column"] {
-        text-align: center;
-        margin-bottom: 5px;
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
     </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# Definicje ścieżek i stałych
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-IMAGE_DIR = os.path.join(BASE_DIR, "images")
-GRID_SIZE = 25 # Układ 5x5
+RENDER_APP_URL = "https://car-bingo.onrender.com"
 
-# Inicjalizacja stanu sesji gracza
-if 'board' not in st.session_state:
-    st.session_state.board = []
-if 'checked' not in st.session_state:
-    st.session_state.checked = [False] * GRID_SIZE
+@st.cache_resource
+def get_game_state():
+    return {
+        "grid_size": 3,
+        "winner": None,
+        "ended": False,
+        "game_id": 1,
+        "all_images": [],
+        "last_global_id": 0
+    }
 
-def load_images():
-    """Wczytanie dostępnych plików graficznych z folderu images."""
-    if not os.path.exists(IMAGE_DIR):
-        return []
-    valid_extensions = ('.png', '.jpg', '.jpeg', '.webp', '.gif')
-    files = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(valid_extensions)]
-    return sorted(files)
+game_state = get_game_state()
+IMAGE_DIR = "images"
 
-def generate_new_board():
-    """Generowanie nowej planszy 5x5 (25 losowych kafelków)."""
-    images = load_images()
-    if len(images) == 0:
-        st.session_state.board = []
-    elif len(images) < GRID_SIZE:
-        st.session_state.board = [random.choice(images) for _ in range(GRID_SIZE)]
-    else:
-        st.session_state.board = random.sample(images, GRID_SIZE)
-    st.session_state.checked = [False] * GRID_SIZE
-
-# --- MENU BOCZNE ---
-with st.sidebar:
-    st.header("⚙️ Menu Gry")
-    
-    if st.button("🔄 Nowa plansza", type="primary", use_container_width=True):
-        generate_new_board()
-        st.rerun()
-        
-    if st.button("🗑️ Odznacz wszystko", use_container_width=True):
-        st.session_state.checked = [False] * GRID_SIZE
-        st.rerun()
-        
-    st.write("---")
-    st.info("Zauważyłeś obiekt za oknem? Kliknij przycisk z jego nazwą na planszy, aby go zaznaczyć. Zdobądź całą planszę, aby wygrać!")
-
-# --- GŁÓWNA APLIKACJA ---
-st.title("🚗 Auto Bingo")
-
-images_available = load_images()
-
-if len(images_available) == 0:
-    st.warning("Brak grafik w folderze 'images'. Dodaj pliki graficzne, aby rozpocząć grę.")
+if os.path.exists(IMAGE_DIR):
+    all_images = [f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
 else:
-    # Wygeneruj planszę przy pierwszym uruchomieniu lub jeśli ma zły rozmiar
-    if not st.session_state.board or len(st.session_state.board) != GRID_SIZE:
-        generate_new_board()
+    all_images = []
 
-    # Wyświetlanie siatki Bingo 5x5
-    board = st.session_state.board
-    for row in range(5):
-        cols = st.columns(5)
-        for col in range(5):
-            idx = row * 5 + col
-            with cols[col]:
-                if idx < len(board):
-                    img_name = board[idx]
-                    img_path = os.path.join(IMAGE_DIR, img_name)
-                    
-                    clean_name = os.path.splitext(img_name)[0].replace("-", " ").replace("_", " ")
+if "my_session_id" not in st.session_state:
+    st.session_state["my_session_id"] = str(random.randint(100000, 999999))
 
-                    # Obrazek
-                    if os.path.exists(img_path):
-                        st.image(img_path, use_container_width=True)
-                    
-                    # Przycisk
-                    is_checked = st.session_state.checked[idx]
-                    btn_label = f"✅ {clean_name}" if is_checked else clean_name
-                    btn_type = "primary" if is_checked else "secondary"
-                    
-                    if st.button(btn_label, key=f"tile_{idx}", type=btn_type, use_container_width=True):
-                        st.session_state.checked[idx] = not st.session_state.checked[idx]
-                        st.rerun()
+if "player_name" not in st.session_state:
+    st.session_state["player_name"] = "Pasażer 1"
 
-    # Sprawdzanie wygranej
-    if all(st.session_state.checked):
-        st.balloons()
-        st.success("🎉 GRATULACJE! Wszystkie pola zaznaczone!")
+if "confirm_restart" not in st.session_state:
+    st.session_state["confirm_restart"] = False
+
+grid_size = game_state["grid_size"]
+required_images = grid_size * grid_size
+
+# Sprawdzamy, czy zmieniła się runda lub rozmiar planszy
+if "current_game_id" not in st.session_state or st.session_state["current_game_id"] != game_state["game_id"] or "my_encoded_images" not in st.session_state:
+    st.session_state["current_game_id"] = game_state["game_id"]
+    if len(all_images) >= required_images:
+        selected_imgs = random.sample(all_images, required_images)
+        encoded_list = []
+        for img_name in selected_imgs:
+            img_path = os.path.join(IMAGE_DIR, img_name)
+            with open(img_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode()
+                encoded_list.append(f"data:image/jpeg;base64,{encoded}")
+        st.session_state["my_encoded_images"] = encoded_list
+    else:
+        st.session_state["my_encoded_images"] = []
+
+st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
+
+# --- KOLEJNOŚĆ INTERFEJSU OD GÓRY ---
+
+# 1. QR Code
+with st.expander("📲 Pokaż kod QR", expanded=False):
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    qr = qrcode.QRCode(version=1, box_size=5, border=1)
+    qr.add_data(RENDER_APP_URL)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf)
+    st.image(buf.getvalue(), width=140)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# 2. Nazwa pasażera
+player_name = st.text_input("Twoje Imię / Nick:", value=st.session_state["player_name"]).strip()
+st.session_state["player_name"] = player_name
+
+# 3. Nowe rozdanie (z potwierdzeniem)
+if not st.session_state["confirm_restart"]:
+    if st.button("🚀 Nowe rozdanie", use_container_width=True, type="secondary"):
+        st.session_state["confirm_restart"] = True
+        st.rerun()
+else:
+    if st.button("⚠️ Potwierdź nowe rozdanie", use_container_width=True, type="primary"):
+        game_state["winner"] = None
+        game_state["ended"] = False
+        game_state["game_id"] += 1
+        st.session_state["confirm_restart"] = False
+        st.rerun()
+
+# 4. Rozmiar planszy
+idx = 0
+if game_state["grid_size"] == 4: idx = 1
+elif game_state["grid_size"] == 5: idx = 2
+
+grid_choice = st.selectbox("Rozmiar planszy:", ["3x3 (9 zdjęć)", "4x4 (16 zdjęć)", "5x5 (25 zdjęć)"], index=idx)
+new_size = int(grid_choice.split("x")[0])
+
+if new_size != game_state["grid_size"]:
+    game_state["grid_size"] = new_size
+    game_state["winner"] = None
+    game_state["ended"] = False
+    game_state["game_id"] += 1
+    st.rerun()
+
+# 5. Odśwież stan
+if st.button("🔄 Odśwież stan", use_container_width=True, type="primary"):
+    st.rerun()
+
+st.write("")
+
+if game_state["ended"]:
+    st.markdown(f"""
+        <div style="background-color: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; margin-top: 10px;">
+            <h1 style="margin:0; font-size: 2.2rem;">🎉 BINGO! 🎉</h1>
+            <h3 style="margin:10px 0 0 0;">Zwycięża: <strong>{game_state['winner']}</strong></h3>
+        </div>
+        
+        <script>
+            if (!window.hasPlayedWinSpeech && 'speechSynthesis' in window) {{
+                window.hasPlayedWinSpeech = true;
+                const msg = new SpeechSynthesisUtterance('Bingo! Zwyciężył gracz {game_state["winner"]}!');
+                msg.lang = 'pl-PL';
+                window.speechSynthesis.speak(msg);
+            }}
+        </script>
+    """, unsafe_allow_html=True)
+    
+    st.write("")
+    if st.button("🚀 Rozpocznij kolejną rundę", use_container_width=True, type="primary"):
+        game_state["winner"] = None
+        game_state["ended"] = False
+        game_state["game_id"] += 1
+        st.rerun()
+else:
+    if len(all_images) < required_images:
+        st.warning(f"Za mało zdjęć! Masz {len(all_images)}, potrzebujesz min. {required_images}!")
+    else:
+        html_height = 750 if grid_size == 3 else (950 if grid_size == 4 else 1150)
+        encoded_images = st.session_state["my_encoded_images"]
+
+        html_code = f"""
+        <style>
+            .bingo-container {{
+                display: grid;
+                grid-template-columns: repeat({grid_size}, 1fr);
+                gap: 5px;
+                width: 100%;
+                max-width: 500px;
+                margin: auto;
+            }}
+            .bingo-card {{
+                position: relative;
+                width: 100%;
+                padding-top: 100%;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                cursor: pointer;
+                user-select: none;
+            }}
+            .bingo-card img {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transition: filter 0.2s;
+            }}
+            .bingo-card.checked img {{
+                filter: grayscale(80%) brightness(40%);
+            }}
+            .bingo-card.checked::after {{
+                content: "❌";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 2.5rem;
+                pointer-events: none;
+            }}
+        </style>
+
+        <div class="bingo-container">
+            {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
+        </div>
+
+        <script>
+            let hasWon = false;
+            const gridSize = {grid_size};
+            const playerName = "{player_name}";
+            const gameId = {game_state['game_id']};
+
+            if (localStorage.getItem('last_game_id') != gameId) {{
+                hasWon = false;
+                localStorage.setItem('last_game_id', gameId);
+                localStorage.removeItem('bingo_checked');
+            }}
+
+            window.onload = function() {{
+                const buttons = window.parent.document.querySelectorAll('button');
+                buttons.forEach(btn => {{
+                    if (btn.innerText.includes('SYSTEM_WIN_BRIDGE')) {{
+                        const container = btn.closest('div[data-testid="stButton"]');
+                        if (container) container.style.display = 'none';
+                    }}
+                }});
+            }}
+
+            function generateWinPatterns(size) {{
+                const patterns = [];
+                for (let r = 0; r < size; r++) {{
+                    const row = [];
+                    for (let c = 0; c < size; c++) row.push(r * size + c);
+                    patterns.push(row);
+                }}
+                for (let c = 0; c < size; c++) {{
+                    const col = [];
+                    for (let r = 0; r < size; r++) col.push(r * size + c);
+                    patterns.push(col);
+                }}
+                const diag1 = [];
+                for (let i = 0; i < size; i++) diag1.push(i * size + i);
+                patterns.push(diag1);
+
+                const diag2 = [];
+                for (let i = 0; i < size; i++) diag2.push(i * size + (size - 1 - i));
+                patterns.push(diag2);
+                return patterns;
+            }}
+
+            const winPatterns = generateWinPatterns(gridSize);
+
+            function triggerWinEvent() {{
+                const buttons = window.parent.document.querySelectorAll('button');
+                buttons.forEach(btn => {{
+                    if (btn.innerText.includes('SYSTEM_WIN_BRIDGE')) {{
+                        btn.click();
+                    }}
+                }});
+            }}
+
+            function playVictorySound() {{
+                try {{
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const ctx = new AudioContext();
+                    const notes = [261.63, 329.63, 392.00, 523.25];
+                    notes.forEach((freq, index) => {{
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.3, ctx.currentTime + index * 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + index * 0.12 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + index * 0.12);
+                        osc.stop(ctx.currentTime + index * 0.12 + 0.3);
+                    }});
+                }} catch(e) {{}}
+            }}
+
+            function checkBingo() {{
+                const cards = document.querySelectorAll('.bingo-card');
+                const checked = Array.from(cards).map(card => card.classList.contains('checked'));
+
+                let isWin = false;
+                for (let pattern of winPatterns) {{
+                    if (pattern.every(index => checked[index])) {{
+                        isWin = true;
+                        break;
+                    }}
+                }}
+
+                if (isWin && !hasWon) {{
+                    hasWon = true;
+                    playVictorySound();
+                    triggerWinEvent();
+                }}
+            }}
+
+            function toggleCard(card) {{
+                card.classList.toggle('checked');
+                checkBingo();
+            }}
+        </script>
+        """
+
+        st.components.v1.html(html_code, height=html_height, scrolling=False)
+
+        if st.button("SYSTEM_WIN_BRIDGE", key="win_bridge"):
+            game_state["ended"] = True
+            game_state["winner"] = player_name
+            st.rerun()
