@@ -19,7 +19,7 @@ hide_streamlit_style = """
     header {visibility: hidden;}
     .block-container {
         padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
+        padding-bottom: 2rem !important;
         padding-left: 0.2rem !important;
         padding-right: 0.2rem !important;
     }
@@ -28,7 +28,8 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 IMAGE_DIR = "images"
-REQUIRED_IMAGES = 25  # Na stałe 5x5
+GRID_SIZE = 5
+REQUIRED_IMAGES = 25  # Wymagane 25 unikalnych obrazków dla siatki 5x5
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
 # Wczytanie listy plików
@@ -41,10 +42,11 @@ if "game_id" not in st.session_state:
     st.session_state["game_id"] = 1
 
 def generate_encoded_images():
-    if not all_images:
+    # Pobieramy 25 UNIKALNYCH obrazków - brak powtórzeń na planszy
+    if len(all_images) < REQUIRED_IMAGES:
         return []
 
-    selected_imgs = [random.choice(all_images) for _ in range(REQUIRED_IMAGES)]
+    selected_imgs = random.sample(all_images, REQUIRED_IMAGES)
 
     encoded_list = []
     for img_name in selected_imgs:
@@ -54,61 +56,38 @@ def generate_encoded_images():
             encoded_list.append(f"data:image/jpeg;base64,{encoded}")
     return encoded_list
 
-if "my_encoded_images" not in st.session_state or len(st.session_state["my_encoded_images"]) != REQUIRED_IMAGES:
+if "my_encoded_images" not in st.session_state:
     st.session_state["my_encoded_images"] = generate_encoded_images()
 
 # --- INTERFEJS APLIKACJI ---
 
-st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 10px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
 
-# Przyciski sterujące
-col1, col2 = st.columns(2)
-with col1:
-    st.markdown("""
-        <button onclick="document.getElementById('qrModalOverlay').style.display='flex'" 
-                style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid #4a4a4a; background-color: #262730; color: white; cursor: pointer; font-weight: bold;">
-            📲 Kod QR
-        </button>
-    """, unsafe_allow_html=True)
+# Przycisk resetu/nowej planszy
+if st.button("🚀 Nowa plansza / Reset", use_container_width=True, type="primary"):
+    st.session_state["game_id"] += 1
+    st.session_state["my_encoded_images"] = generate_encoded_images()
+    st.rerun()
 
-with col2:
-    if st.button("🚀 Reset / Nowa plansza", use_container_width=True, type="primary"):
-        st.session_state["game_id"] += 1
-        st.session_state["my_encoded_images"] = generate_encoded_images()
-        st.rerun()
+st.write("")
 
-# Pełnoekranowy kod QR (sam w sobie jest przyciskiem do zamykania)
-qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={RENDER_APP_URL}"
-st.markdown(f"""
-    <div id="qrModalOverlay" onclick="this.style.display='none'" style="
-        display: none;
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        background-color: rgba(0, 0, 0, 0.92);
-        z-index: 999999;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        color: white;
-        cursor: pointer;
-    ">
-        <h2 style="margin-bottom: 15px; pointer-events: none;">Zeskanuj, aby dołączyć</h2>
-        <img src="{qr_code_url}" style="width: 260px; height: 260px; border-radius: 12px; background: white; padding: 10px; pointer-events: none;">
-        <p style="margin-top: 15px; font-size: 0.85rem; color: #aaa; pointer-events: none;">Dotknij w dowolnym miejscu, aby zamknąć</p>
-    </div>
-""", unsafe_allow_html=True)
-
-if len(all_images) == 0:
-    st.warning("Brak grafik w folderze 'images'. Dodaj pliki do repozytorium, aby rozpocząć grę.")
+if len(all_images) < REQUIRED_IMAGES:
+    st.error(f"W folderze 'images' znajduje się **{len(all_images)}** grafik. Wymagane jest minimum **25 unikalnych obrazków**, aby uruchomić planszę 5x5 bez powtórzeń.")
 else:
     encoded_images = st.session_state["my_encoded_images"]
-    
+    if not encoded_images:
+        encoded_images = generate_encoded_images()
+        st.session_state["my_encoded_images"] = encoded_images
+
+    qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={RENDER_APP_URL}"
+
     html_code = f"""
     <style>
         body {{
             margin: 0;
             padding: 0;
             background-color: transparent;
+            font-family: sans-serif;
         }}
         .bingo-container {{
             display: grid !important;
@@ -153,19 +132,43 @@ else:
             font-size: 1.8rem !important;
             pointer-events: none !important;
         }}
+        .qr-section {{
+            margin-top: 40px;
+            padding: 20px;
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+        }}
+        .qr-section img {{
+            width: 200px;
+            height: 200px;
+            border-radius: 8px;
+            background: white;
+            padding: 8px;
+            margin-top: 10px;
+        }}
     </style>
 
     <div class="bingo-container" id="bingoGrid">
         {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
     </div>
 
-    <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 10px;">
+    <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 15px;">
         <h3 style="margin:0;">🎉 BINGO! WYGRAŁEM! 🎉</h3>
+    </div>
+
+    <!-- Kod QR stały pod planszą -->
+    <div class="qr-section">
+        <h4 style="margin: 0 0 5px 0;">📲 Zeskanuj, aby grać na swoim telefonie</h4>
+        <img src="{qr_code_url}" alt="Kod QR Dołączenia">
     </div>
 
     <script>
         const gameId = {st.session_state['game_id']};
 
+        // Zabezpieczenie przed utratą stanu przy odświeżeniu
         if (localStorage.getItem('current_game_id') != gameId) {{
             localStorage.setItem('current_game_id', gameId);
             localStorage.removeItem('bingo_checked_state');
@@ -257,4 +260,4 @@ else:
     </script>
     """
 
-    st.components.v1.html(html_code, height=520, scrolling=False)
+    st.components.v1.html(html_code, height=820, scrolling=True)
