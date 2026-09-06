@@ -121,24 +121,28 @@ else:
             transition: filter 0.2s !important;
         }}
         
-        /* Zaznaczony kafelek - jednakowy krzyżyk na całą białą ramkę */
-        .bingo-card.checked img {{
-            filter: grayscale(80%) brightness(40%) !important;
-        }}
-        .bingo-card.checked::after {{
-            content: "❌" !important;
+        /* Osobna warstwa nakładki zakrywająca Cały kafelek 100% x 100% */
+        .cross-overlay {{
+            display: none;
             position: absolute !important;
             top: 0 !important;
             left: 0 !important;
             width: 100% !important;
             height: 100% !important;
-            display: flex !important;
+            background-color: rgba(0, 0, 0, 0.5) !important;
             align-items: center !important;
             justify-content: center !important;
             font-size: 2.2rem !important;
+            z-index: 10 !important;
             pointer-events: none !important;
             box-sizing: border-box !important;
         }}
+
+        /* Pokazywanie nakładki przy zaznaczeniu */
+        .bingo-card.checked .cross-overlay {{
+            display: flex !important;
+        }}
+
         .qr-section {{
             margin-top: 250px;
             padding: 20px;
@@ -190,7 +194,10 @@ else:
         function renderBoard() {{
             const grid = document.getElementById('bingoGrid');
             grid.innerHTML = activeImages.map((imgUrl, i) => 
-                `<div class="bingo-card" data-idx="${{i}}" onclick="toggleCard(this)"><img src="${{imgUrl}}"></div>`
+                `<div class="bingo-card" data-idx="${{i}}" onclick="toggleCard(this)">
+                    <img src="${{imgUrl}}">
+                    <div class="cross-overlay">❌</div>
+                </div>`
             ).join('');
         }}
 
