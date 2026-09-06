@@ -1,6 +1,7 @@
 import os
 import random
 import base64
+import json
 import streamlit as st
 
 # Config strony
@@ -78,6 +79,7 @@ else:
         st.session_state["my_encoded_images"] = encoded_images
 
     qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={RENDER_APP_URL}"
+    encoded_json = json.dumps(encoded_images)
 
     html_code = f"""
     <style>
@@ -149,9 +151,7 @@ else:
         }}
     </style>
 
-    <div class="bingo-container" id="bingoGrid">
-        {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
-    </div>
+    <div class="bingo-container" id="bingoGrid"></div>
 
     <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 15px;">
         <h3 style="margin:0;">🎉 BINGO! WYGRAŁEM! 🎉</h3>
@@ -164,23 +164,44 @@ else:
     </div>
 
     <script>
-        const gameId = {st.session_state['game_id']};
+        const currentGameId = {st.session_state['game_id']};
+        const serverImages = {encoded_json};
 
-        if (localStorage.getItem('current_game_id') != gameId) {{
-            localStorage.setItem('current_game_id', gameId);
+        // Zabezpieczenie przed przypadkowym przeładowaniem:
+        // Sprawdzamy czy w localStorage istnieje już zapisana plansza dla obecnej gry
+        let activeImages = [];
+        const savedGameId = localStorage.getItem('bingo_game_id');
+        const savedBoard = localStorage.getItem('bingo_board_images');
+
+        if (savedGameId == currentGameId && savedBoard) {{
+            // Odzyskujemy istniejącą planszę sprzed odświeżenia
+            activeImages = JSON.parse(savedBoard);
+        }} else {{
+            // Generujemy nową planszę i zapisujemy ją w przeglądarce
+            activeImages = serverImages;
+            localStorage.setItem('bingo_game_id', currentGameId);
+            localStorage.setItem('bingo_board_images', JSON.stringify(serverImages));
             localStorage.removeItem('bingo_checked_state');
         }}
 
-        window.onload = function() {{
-            const savedState = JSON.parse(localStorage.getItem('bingo_checked_state') || '[]');
-            const cards = document.querySelectorAll('.bingo-card');
-            cards.forEach((card, idx) => {{
-                if (savedState[idx]) {{
-                    card.classList.add('checked');
-                }}
-            }});
-            checkBingo(false);
-        }};
+        // Renderowanie kafelków wewnątrz DOM
+        function renderBoard() {{
+            const grid = document.getElementById('bingoGrid');
+            grid.innerHTML = activeImages.map((imgUrl, i) => 
+                `<div class="bingo-card" data-idx="${{i}}" onclick="toggleCard(this)"><img src="${{imgUrl}}"></div>`
+            ).join('');
+        }}
+
+        renderBoard();
+
+        // Otwieranie zapisanego stanu zaznaczeń pól
+        const savedState = JSON.parse(localStorage.getItem('bingo_checked_state') || '[]');
+        const cards = document.querySelectorAll('.bingo-card');
+        cards.forEach((card, idx) => {{
+            if (savedState[idx]) {{
+                card.classList.add('checked');
+            }}
+        }});
 
         function saveState() {{
             const cards = document.querySelectorAll('.bingo-card');
@@ -260,6 +281,8 @@ else:
                 banner.style.display = 'none';
             }}
         }}
+
+        checkBingo(false);
 
         function toggleCard(card) {{
             card.classList.toggle('checked');
