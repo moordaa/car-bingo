@@ -101,7 +101,7 @@ else:
             position: relative !important;
             width: 100% !important;
             padding-top: 100% !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
             overflow: hidden !important;
             background-color: #ffffff !important;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
@@ -116,24 +116,31 @@ else:
             width: 100% !important;
             height: 100% !important;
             object-fit: contain !important;
-            padding: 3px !important;
+            padding: 4px !important;
             box-sizing: border-box !important;
             transition: filter 0.2s !important;
         }}
+        
+        /* Zaznaczony kafelek - jednakowy krzyżyk na całą białą ramkę */
         .bingo-card.checked img {{
-            filter: grayscale(80%) brightness(30%) !important;
+            filter: grayscale(80%) brightness(40%) !important;
         }}
         .bingo-card.checked::after {{
             content: "❌" !important;
             position: absolute !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            font-size: 1.8rem !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 2.2rem !important;
             pointer-events: none !important;
+            box-sizing: border-box !important;
         }}
         .qr-section {{
-            margin-top: 250px; /* Duży odstęp wymuszający zeskrolowanie */
+            margin-top: 250px;
             padding: 20px;
             text-align: center;
             background-color: rgba(255, 255, 255, 0.05);
@@ -167,24 +174,19 @@ else:
         const currentGameId = {st.session_state['game_id']};
         const serverImages = {encoded_json};
 
-        // Zabezpieczenie przed przypadkowym przeładowaniem:
-        // Sprawdzamy czy w localStorage istnieje już zapisana plansza dla obecnej gry
         let activeImages = [];
         const savedGameId = localStorage.getItem('bingo_game_id');
         const savedBoard = localStorage.getItem('bingo_board_images');
 
         if (savedGameId == currentGameId && savedBoard) {{
-            // Odzyskujemy istniejącą planszę sprzed odświeżenia
             activeImages = JSON.parse(savedBoard);
         }} else {{
-            // Generujemy nową planszę i zapisujemy ją w przeglądarce
             activeImages = serverImages;
             localStorage.setItem('bingo_game_id', currentGameId);
             localStorage.setItem('bingo_board_images', JSON.stringify(serverImages));
             localStorage.removeItem('bingo_checked_state');
         }}
 
-        // Renderowanie kafelków wewnątrz DOM
         function renderBoard() {{
             const grid = document.getElementById('bingoGrid');
             grid.innerHTML = activeImages.map((imgUrl, i) => 
@@ -194,7 +196,6 @@ else:
 
         renderBoard();
 
-        // Otwieranie zapisanego stanu zaznaczeń pól
         const savedState = JSON.parse(localStorage.getItem('bingo_checked_state') || '[]');
         const cards = document.querySelectorAll('.bingo-card');
         cards.forEach((card, idx) => {{
