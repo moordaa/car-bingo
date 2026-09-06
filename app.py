@@ -49,13 +49,15 @@ else:
 
     html_code = f"""
     <style>
-        body {{ margin: 0; background: transparent; font-family: sans-serif; }}
+        body {{ margin: 0; background: transparent; font-family: sans-serif; overflow-x: hidden; }}
         .bingo-container {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; max-width: 480px; margin: auto; }}
-        .bingo-card {{ position: relative; width: 100%; padding-top: 100%; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); cursor: pointer; user-select: none; }}
-        .bingo-card img {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; padding: 4px; box-sizing: border-box; }}
-        .cross-overlay {{ display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; font-size: 2.2rem; pointer-events: none; }}
+        .bingo-card {{ position: relative; width: 100%; padding-top: 100%; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); cursor: pointer; user-select: none; box-sizing: border-box; }}
+        .bingo-card img {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; padding: 4px; box-sizing: border-box; transition: filter 0.2s; }}
+        
+        .cross-overlay {{ display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; font-size: 2.2rem; pointer-events: none; z-index: 10; box-sizing: border-box; }}
         .bingo-card.checked .cross-overlay {{ display: flex; }}
         .bingo-card.checked img {{ filter: grayscale(80%) brightness(40%); }}
+
         .qr-section {{ margin-top: 250px; padding: 20px; text-align: center; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); color: #fff; }}
         .qr-section img {{ width: 200px; height: 200px; border-radius: 8px; background: #fff; padding: 8px; margin-top: 10px; }}
     </style>
@@ -135,4 +137,4 @@ else:
     </script>
     """
 
-    st.components.v1.html(html_code, height=1050, scrolling=True)
+    st.components.v1.html(html_code, height=900, scrolling=True)
