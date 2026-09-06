@@ -28,7 +28,6 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 IMAGE_DIR = "images"
-GRID_SIZE = 5
 REQUIRED_IMAGES = 25  # Wymagane 25 unikalnych obrazków dla siatki 5x5
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
@@ -42,7 +41,6 @@ if "game_id" not in st.session_state:
     st.session_state["game_id"] = 1
 
 def generate_encoded_images():
-    # Pobieramy 25 UNIKALNYCH obrazków - brak powtórzeń na planszy
     if len(all_images) < REQUIRED_IMAGES:
         return []
 
@@ -133,7 +131,7 @@ else:
             pointer-events: none !important;
         }}
         .qr-section {{
-            margin-top: 40px;
+            margin-top: 250px; /* Duży odstęp wymuszający zeskrolowanie */
             padding: 20px;
             text-align: center;
             background-color: rgba(255, 255, 255, 0.05);
@@ -159,16 +157,15 @@ else:
         <h3 style="margin:0;">🎉 BINGO! WYGRAŁEM! 🎉</h3>
     </div>
 
-    <!-- Kod QR stały pod planszą -->
+    <!-- Kod QR daleko pod planszą -->
     <div class="qr-section">
-        <h4 style="margin: 0 0 5px 0;">📲 Zeskanuj, aby grać na swoim telefonie</h4>
+        <h4 style="margin: 0 0 5px 0;">Zeskanuj, aby grać na swoim telefonie</h4>
         <img src="{qr_code_url}" alt="Kod QR Dołączenia">
     </div>
 
     <script>
         const gameId = {st.session_state['game_id']};
 
-        // Zabezpieczenie przed utratą stanu przy odświeżeniu
         if (localStorage.getItem('current_game_id') != gameId) {{
             localStorage.setItem('current_game_id', gameId);
             localStorage.removeItem('bingo_checked_state');
@@ -215,6 +212,17 @@ else:
 
         const winPatterns = generateWinPatterns();
 
+        function speakWin() {{
+            if ('speechSynthesis' in window) {{
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance("BINGO! WYGRAŁEM!");
+                msg.lang = 'pl-PL';
+                msg.rate = 1.0;
+                msg.pitch = 1.1;
+                window.speechSynthesis.speak(msg);
+            }}
+        }}
+
         function playVictorySound() {{
             try {{
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -245,6 +253,7 @@ else:
             if (isWin) {{
                 if (banner.style.display === 'none' && playSound) {{
                     playVictorySound();
+                    speakWin();
                 }}
                 banner.style.display = 'block';
             }} else {{
@@ -260,4 +269,4 @@ else:
     </script>
     """
 
-    st.components.v1.html(html_code, height=820, scrolling=True)
+    st.components.v1.html(html_code, height=1050, scrolling=True)
