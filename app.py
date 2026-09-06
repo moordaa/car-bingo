@@ -18,29 +18,29 @@ hide_streamlit_style = """
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        padding-left: 0.2rem !important;
+        padding-right: 0.2rem !important;
     }
     
-    /* Stylizacja siatki 5x5 i kafelków */
+    /* Kompaktowa siatka 5x5 mieszcząca się w całości na ekranie */
     .bingo-container {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        gap: 6px;
+        gap: 4px;
         width: 100%;
-        max-width: 600px;
+        max-width: 480px;
         margin: auto;
     }
     .bingo-card {
         position: relative;
         width: 100%;
-        padding-top: 100%;
-        border-radius: 8px;
+        padding-top: 85%; /* Zmniejszona wysokość kafelka */
+        border-radius: 6px;
         overflow: hidden;
-        background-color: white;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        background-color: #ffffff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         cursor: pointer;
         user-select: none;
     }
@@ -50,13 +50,13 @@ hide_streamlit_style = """
         left: 0;
         width: 100%;
         height: 100%;
-        object-fit: contain;
-        padding: 4px;
+        object-fit: contain; /* Pomniejszenie obrazka do kafelka */
+        padding: 2px;
         box-sizing: border-box;
         transition: filter 0.2s;
     }
     .bingo-card.checked img {
-        filter: grayscale(80%) brightness(40%);
+        filter: grayscale(80%) brightness(30%);
     }
     .bingo-card.checked::after {
         content: "❌";
@@ -64,7 +64,7 @@ hide_streamlit_style = """
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        font-size: 2.2rem;
+        font-size: 1.8rem;
         pointer-events: none;
     }
     </style>
@@ -72,7 +72,6 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 IMAGE_DIR = "images"
-GRID_SIZE = 5
 REQUIRED_IMAGES = 25  # Na stałe 5x5
 RENDER_APP_URL = "https://car-bingo.onrender.com"
 
@@ -86,12 +85,11 @@ if "game_id" not in st.session_state:
     st.session_state["game_id"] = 1
 
 def generate_encoded_images():
-    if len(all_images) >= REQUIRED_IMAGES:
-        selected_imgs = random.sample(all_images, REQUIRED_IMAGES)
-    elif len(all_images) > 0:
-        selected_imgs = [random.choice(all_images) for _ in range(REQUIRED_IMAGES)]
-    else:
+    if not all_images:
         return []
+
+    # Generowanie dokładnie 25 elementów (z powtórzeniami, jeśli plików jest mniej niż 25)
+    selected_imgs = [random.choice(all_images) for _ in range(REQUIRED_IMAGES)]
 
     encoded_list = []
     for img_name in selected_imgs:
@@ -106,20 +104,20 @@ if "my_encoded_images" not in st.session_state or len(st.session_state["my_encod
 
 # --- INTERFEJS APLIKACJI ---
 
-st.markdown("<h2 style='text-align: center; margin-top: 0; margin-bottom: 10px;'>🚗 Auto Bingo</h2>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; margin-top: 0; margin-bottom: 5px;'>🚗 Auto Bingo</h3>", unsafe_allow_html=True)
 
-# Przyciski sterujące bezpośrednio pod nazwą gry
+# Przyciski sterujące pod nazwą gry
 col1, col2 = st.columns(2)
 with col1:
     show_qr = st.button("📲 Kod QR", use_container_width=True, type="secondary")
 
 with col2:
-    if st.button("🚀 Resetuj / Nowa plansza", use_container_width=True, type="primary"):
+    if st.button("🚀 Reset / Nowa plansza", use_container_width=True, type="primary"):
         st.session_state["game_id"] += 1
         st.session_state["my_encoded_images"] = generate_encoded_images()
         st.rerun()
 
-# Pełnoekranowe okno z kodem QR (Modal Overlay)
+# Pełnoekranowy kod QR
 if show_qr:
     qr_code_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={RENDER_APP_URL}"
     st.markdown(f"""
@@ -135,14 +133,11 @@ if show_qr:
             color: white;
         ">
             <h2 style="margin-bottom: 20px;">Zeskanuj, aby dołączyć</h2>
-            <img src="{qr_code_url}" style="width: 280px; height: 280px; border-radius: 12px; background: white; padding: 10px;">
-            <p style="margin-top: 20px; font-size: 0.9rem; color: #ccc;">Zamknij to okno poniższym przyciskiem</p>
+            <img src="{qr_code_url}" style="width: 250px; height: 250px; border-radius: 12px; background: white; padding: 10px;">
         </div>
     """, unsafe_allow_html=True)
     if st.button("❌ Zamknij Kod QR", type="primary", use_container_width=True):
         st.rerun()
-
-st.write("")
 
 if len(all_images) == 0:
     st.warning("Brak grafik w folderze 'images'. Dodaj pliki do repozytorium, aby rozpocząć grę.")
@@ -154,8 +149,8 @@ else:
         {"".join([f'<div class="bingo-card" data-idx="{i}" onclick="toggleCard(this)"><img src="{img_url}"></div>' for i, img_url in enumerate(encoded_images)])}
     </div>
 
-    <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 15px; border-radius: 12px; text-align: center; margin-top: 15px;">
-        <h2 style="margin:0;">🎉 WYGRAŁEM! BINGO! 🎉</h2>
+    <div id="winBanner" style="display: none; background-color: #28a745; color: white; padding: 10px; border-radius: 8px; text-align: center; margin-top: 10px;">
+        <h3 style="margin:0;">🎉 BINGO! WYGRAŁEM! 🎉</h3>
     </div>
 
     <script>
@@ -252,4 +247,4 @@ else:
     </script>
     """
 
-    st.components.v1.html(html_code, height=780, scrolling=False)
+    st.components.v1.html(html_code, height=620, scrolling=False)
